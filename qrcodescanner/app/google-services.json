@@ -1,0 +1,59 @@
+{
+  "project_info": {
+    "project_number": "69537583971",
+    "firebase_url": "https://attendance-rec.firebaseio.com",
+    "project_id": "attendance-rec",
+    "storage_bucket": "attendance-rec.appspot.com"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:69537583971:android:4cb3044e6a98b668",
+        "android_client_info": {
+          "package_name": "com.tanwir.qrcodescanner"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "69537583971-mdcb7hdn85e4t4bjhchuue5o7g972ncf.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.tanwir.qrcodescanner",
+            "certificate_hash": "2bc52afd960382016624b09795718cd08ca6ce55"
+          }
+        },
+        {
+          "client_id": "69537583971-4pv3vj9np69ki4j8hhdqmqpg6krvhfvs.apps.googleusercontent.com",
+          "client_type": 3
+        },
+        {
+          "client_id": "69537583971-4pv3vj9np69ki4j8hhdqmqpg6krvhfvs.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyD1H9BXkWDXbdBNd4zVw7jSzNyo9pDwXb4"
+        }
+      ],
+      "services": {
+        "analytics_service": {
+          "status": 1
+        },
+        "appinvite_service": {
+          "status": 2,
+          "other_platform_oauth_client": [
+            {
+              "client_id": "69537583971-4pv3vj9np69ki4j8hhdqmqpg6krvhfvs.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        },
+        "ads_service": {
+          "status": 2
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

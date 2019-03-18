@@ -1,0 +1,55 @@
+<resources>
+    <string name="app_name">REC Attendance</string>
+    <string name="scan">Scan</string>
+    <string name="scanacode">Scan a Code</string>
+    <string name="reason">Please Enter a Tardy Reason</string>
+    <string name="reasonhint">Reason</string>
+    <string name="send">Send</string>
+    <string name="roster_file_name">roster.json</string>
+    <string name="file_name">studentSaved.txt</string>
+    <string name="title_activity_login">Sign in</string>
+    <string name="roles">Student:Teacher:Management:Intern</string>
+    <string name="months">Jul:Aug:Sep:Oct:Nov:Dec</string>
+    <array name="roles">
+        <item>Select a Role</item>
+        <item>Student</item>
+        <item>Teacher</item>
+        <item>Management</item>
+        <item>Intern</item>
+    </array>
+    <array name="grades">
+        <item>Select a Grade</item>
+        <item>1st Grade</item>
+        <item>2nd Grade</item>
+        <item>3rd Grade</item>
+        <item>4th Grade</item>
+        <item>5th Grade</item>
+        <item>6th Grade</item>
+    </array>
+    <string name="prompt_email">Email</string>
+    <string name="prompt_password">Password (optional)</string>
+    <string name="action_sign_in">Sign in or register</string>
+    <string name="action_sign_in_short">Sign in</string>
+    <string name="error_invalid_email">This email address is invalid</string>
+    <string name="error_invalid_password">This password is too short</string>
+    <string name="error_incorrect_password">This password is incorrect</string>
+    <string name="error_field_required">This field is required</string>
+    <string name="permission_rationale">"Contacts permissions are needed for providing email
+        completions."
+    </string>
+    <string name="roster_download">Download Roster</string>
+    <string name="save_string">Send saved to DB</string>
+    <array name="reasons">
+        <item>Select a Reason</item>
+        <item>Extracurricular Education</item>
+        <item>Extracurricular Sports</item>
+        <item>Heatlh</item>
+        <item>Personal</item>
+        <item>Transportation</item>
+        <item>Traveling</item>
+        <item>Did Not Call</item>
+        <item>No Response</item>
+        <item>Bad Contact Number</item>
+        <item>Other</item>
+    </array>
+</resources>
