@@ -8,11 +8,11 @@ import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.net.ConnectivityManager;
 import android.net.NetworkInfo;
-import android.support.annotation.NonNull;
-import android.support.v4.app.ActivityCompat;
-import android.support.v4.content.ContextCompat;
-import android.support.v7.app.AlertDialog;
-import android.support.v7.app.AppCompatActivity;
+import androidx.annotation.NonNull;
+import androidx.core.app.ActivityCompat;
+import androidx.core.content.ContextCompat;
+import androidx.appcompat.app.AlertDialog;
+import androidx.appcompat.app.AppCompatActivity;
 import android.os.Bundle;
 import android.util.JsonReader;
 import android.util.JsonWriter;
@@ -21,8 +21,6 @@ import android.view.Menu;
 import android.view.MenuInflater;
 import android.view.MenuItem;
 import android.view.View;
-import android.widget.AdapterView;
-import android.widget.ArrayAdapter;
 import android.widget.Button;
 import android.widget.EditText;
 import android.widget.Spinner;
@@ -30,7 +28,6 @@ import android.widget.TextView;
 import android.widget.Toast;
 
 import com.blikoon.qrcodescanner.QrCodeActivity;
-import com.google.firebase.auth.FirebaseAuth;
 import com.google.firebase.database.DataSnapshot;
 import com.google.firebase.database.DatabaseError;
 import com.google.firebase.database.DatabaseReference;
@@ -38,23 +35,14 @@ import com.google.firebase.database.FirebaseDatabase;
 import com.google.firebase.database.Query;
 import com.google.firebase.database.ValueEventListener;
 
-import org.json.JSONArray;
-
 import java.io.BufferedReader;
-import java.io.BufferedWriter;
 import java.io.File;
-import java.io.FileInputStream;
 import java.io.FileOutputStream;
-import java.io.FileWriter;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
-import java.io.OutputStream;
 import java.io.OutputStreamWriter;
-import java.io.UnsupportedEncodingException;
-import java.io.Writer;
 import java.text.DateFormat;
-import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.Calendar;
 import java.util.Date;
@@ -64,8 +52,9 @@ import java.util.HashSet;
 import java.util.Iterator;
 import java.util.Map;
 
-public class ScanActivity extends AppCompatActivity  implements AdapterView.OnItemSelectedListener {
+public class ScanActivity extends AppCompatActivity {
     private static final int REQUEST_CODE_QR_SCAN = 101;
+    private static final int REQUEST_TARDY_INFORMATION = 102;
     private static final String SCAN = "SCAN";
     private static final String SEND = "SEND";
     private TextView tardyText;
@@ -76,8 +65,6 @@ public class ScanActivity extends AppCompatActivity  implements AdapterView.OnIt
     private Person personScanned;
     private Calendar calendar;
     private Spinner tardyReason;
-    private ArrayAdapter<CharSequence> reasons;
-    private boolean userIsInteracting;
     private HashMap<String, ArrayList<Person>> allPeople;
     private HashSet<Person> savedPeople = new HashSet<>();
 
@@ -93,20 +80,10 @@ public class ScanActivity extends AppCompatActivity  implements AdapterView.OnIt
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-        setContentView(R.layout.activity_main);
+        setContentView(R.layout.activity_scan);
         calendar = GregorianCalendar.getInstance();
         calendar.setTime(new Date());
-        userIsInteracting = false;
-        tardyText = findViewById(R.id.tardyText);
-        tardyComments = findViewById(R.id.tardyComments);
         scanButton = findViewById(R.id.btn_scan);
-        tardyText.setVisibility(View.INVISIBLE);
-        tardyComments.setVisibility(View.INVISIBLE);
-        tardyReason = findViewById(R.id.tardyReason);
-        reasons = ArrayAdapter.createFromResource(this, R.array.reasons, android.R.layout.simple_spinner_dropdown_item);
-        tardyReason.setAdapter(reasons);
-        tardyReason.setVisibility(View.INVISIBLE);
-        tardyReason.setOnItemSelectedListener(this);
 
         checkPermissions();
         if (checkInternet()) {
@@ -199,13 +176,9 @@ public class ScanActivity extends AppCompatActivity  implements AdapterView.OnIt
 
     public boolean sendToDatabase(boolean fromFile) {
         if (personScanned != null) {
-            if (tardyReason.getVisibility() == View.VISIBLE && tardyReason.getSelectedItem().equals(reasons.getItem(0))) {
+            if (personScanned.getReason() == null && personScanned.isTardy()) {
                 Toast.makeText(this, "No Reason Selected, Please Select a Reason", Toast.LENGTH_SHORT).show();
                 return false;
-            } else if (tardyComments.getVisibility() == View.VISIBLE) {
-                personScanned.setReason(tardyReason.getSelectedItem().toString());
-                if (!tardyComments.getText().toString().isEmpty())
-                    personScanned.setComments(tardyComments.getText().toString());
             }
             if (checkInternet()) {
                 if (fromFile) {
@@ -223,7 +196,6 @@ public class ScanActivity extends AppCompatActivity  implements AdapterView.OnIt
                             personRef.child("Reason").setValue(personScanned.getReason());
                         if (personScanned.getComments() != null)
                             personRef.child("Comments").setValue(personScanned.getComments());
-                        returnToScanPage();
                         break;
 
                     case "Management":
@@ -233,7 +205,6 @@ public class ScanActivity extends AppCompatActivity  implements AdapterView.OnIt
                             personRef.child("Reason").setValue(personScanned.getReason());
                         if (personScanned.getComments() != null)
                             personRef.child("Comments").setValue(personScanned.getComments());
-                        returnToScanPage();
                         break;
 
                     case "Intern":
@@ -245,7 +216,6 @@ public class ScanActivity extends AppCompatActivity  implements AdapterView.OnIt
                             personRef.child("Reason").setValue(personScanned.getReason());
                         if (personScanned.getComments() != null)
                             personRef.child("Comments").setValue(personScanned.getComments());
-                        returnToScanPage();
                         break;
 
                     case "Teacher":
@@ -255,12 +225,10 @@ public class ScanActivity extends AppCompatActivity  implements AdapterView.OnIt
                             personRef.child("Reason").setValue(personScanned.getReason());
                         if (personScanned.getComments() != null)
                             personRef.child("Comments").setValue(personScanned.getComments());
-                        returnToScanPage();
                         break;
 
                     default:
                         alertDialogCreator("Invalid Post", "Data was sent incorrectly, Please try Again");
-                        returnToScanPage();
                         return false;
                 }
                 return true;
@@ -268,12 +236,10 @@ public class ScanActivity extends AppCompatActivity  implements AdapterView.OnIt
                 savedPeople.add(personScanned);
                 writeSavedStudentsToFile();
                 Toast.makeText(this, "No Internet, Student saved to file, attendance not updated", Toast.LENGTH_SHORT).show();
-                returnToScanPage();
                 return false;
             }
         }
         alertDialogCreator("Error", "Something went wrong try again");
-        returnToScanPage();
         return false;
     }
 
@@ -325,10 +291,9 @@ public class ScanActivity extends AppCompatActivity  implements AdapterView.OnIt
                             personScanned = searchForStudentInMap(options);
                             personScanned.setTime(time);
                             personScanned.setDate(todayDate);
-                            if (personScanned.getRole().equals("Student") && ((calendar.get(Calendar.HOUR_OF_DAY) > 10) || (calendar.get(Calendar.HOUR_OF_DAY) == 10 && calendar.get(Calendar.MINUTE) > 40))) {
-                                showTardy();
-                            } else if((calendar.get(Calendar.HOUR_OF_DAY) > 10) || (calendar.get(Calendar.HOUR_OF_DAY) == 10 && calendar.get(Calendar.MINUTE) > 0)) {
-                                showTardy();
+                            if ((personScanned.getRole().equals("Student") && (personIsTardy(10, 40)) || personIsTardy(10, 0))) {
+                                personScanned.setTardy(true);
+                                startActivityForResult(new Intent(ScanActivity.this, TardyActivity.class), REQUEST_TARDY_INFORMATION);
                             } else {
                                 if (sendToDatabase(false))
                                     Toast.makeText(ScanActivity.this, "Successfully sent to Database", Toast.LENGTH_SHORT).show();
@@ -343,6 +308,13 @@ public class ScanActivity extends AppCompatActivity  implements AdapterView.OnIt
                 }
             });
             alertDialog.show();
+        } else if(requestCode == REQUEST_TARDY_INFORMATION) {
+            if (data == null) return;
+            String[] tardyInfo = data.getStringArrayExtra("tardyInfo");
+            personScanned.setReason(tardyInfo[0]);
+            if(tardyInfo[1] != null && !tardyInfo[1].isEmpty())
+                personScanned.setComments(tardyInfo[1]);
+            sendToDatabase(false);
         }
     }
 
@@ -384,7 +356,6 @@ public class ScanActivity extends AppCompatActivity  implements AdapterView.OnIt
         try {
             NetworkInfo networkInfo = a.getActiveNetworkInfo();
             if (!networkInfo.isConnectedOrConnecting()) {
-
                 return false;
             } else {
                 return true;
@@ -399,27 +370,6 @@ public class ScanActivity extends AppCompatActivity  implements AdapterView.OnIt
         mgmtRef = dateRef.child("Management");
         supportRef = dateRef.child("Intern");
         teacherRef = dateRef.child("Teacher");
-    }
-
-    @Override
-    public void onUserInteraction() {
-        super.onUserInteraction();
-        userIsInteracting = true;
-    }
-
-    @Override
-    public void onItemSelected(AdapterView<?> parent, View view, int position, long id) {
-        String selectItemText = reasons.getItem(0).toString();
-        Log.d("SOMEDUDE", "onItemSelected: " + selectItemText);
-        if (!parent.getSelectedItem().toString().equalsIgnoreCase(selectItemText) && userIsInteracting) {
-            Log.d("HELLO", "onItemSelected: ITEM HAS BEEN SELECTED!!!!");
-            tardyComments.setVisibility(View.VISIBLE);
-        }
-    }
-
-    @Override
-    public void onNothingSelected(AdapterView<?> parent) {
-
     }
 
     public void showTardy() {
@@ -628,11 +578,8 @@ public class ScanActivity extends AppCompatActivity  implements AdapterView.OnIt
         return null;
     }
 
-    public void returnToScanPage() {
-        tardyReason.setVisibility(View.INVISIBLE);
-        tardyComments.setVisibility(View.INVISIBLE);
-        tardyComments.setText("");
-        tardyText.setVisibility(View.INVISIBLE);
-        scanButton.setText(SCAN);
+    public boolean personIsTardy(int hour, int minute) {
+        return (calendar.get(Calendar.HOUR_OF_DAY) > hour) || (calendar.get(Calendar.HOUR_OF_DAY) == hour && calendar.get(Calendar.MINUTE) > minute);
     }
+
 }

@@ -2,7 +2,7 @@ package com.tanwir.qrcodescanner;
 
 import android.app.DatePickerDialog;
 import android.app.TimePickerDialog;
-import android.support.v7.app.AppCompatActivity;
+import androidx.appcompat.app.AppCompatActivity;
 import android.os.Bundle;
 import android.view.View;
 import android.widget.AdapterView;
@@ -16,8 +16,6 @@ import android.widget.Toast;
 
 import com.google.firebase.database.DatabaseReference;
 import com.google.firebase.database.FirebaseDatabase;
-
-import org.w3c.dom.Text;
 
 import java.text.DateFormat;
 import java.util.Calendar;
@@ -182,33 +180,17 @@ public class ManualEntryActivity extends AppCompatActivity implements AdapterVie
 
     @Override
     public void onItemSelected(AdapterView<?> parent, View view, int position, long id) {
-        for (String s : roles) {
-            if (!parent.getItemAtPosition(position).toString().equals(roles[0])) {
-                if (parent.getItemAtPosition(position).toString().equals(s)) {
-                    grade = null;
-                    role = s;
-                    if (s.equals("Student")) {
-                        sp2.setVisibility(View.VISIBLE);
-                        return;
-                    }
-                    sp2.setVisibility(View.INVISIBLE);
-                    return;
-                }
-            } else {
-                sp2.setVisibility(View.INVISIBLE);
-                Toast.makeText(this, "Please Select A Valid Role", Toast.LENGTH_SHORT).show();
+        if (!parent.getItemAtPosition(position).toString().equals(roles[0])) {
+            role = parent.getItemAtPosition(position).toString();
+            if (role.equals(roles[1])) {
+                sp2.setVisibility(View.VISIBLE);
                 return;
             }
-        }
-        if (sp2.getVisibility() == View.VISIBLE && parent.getItemAtPosition(position).toString().equals("Select A Grade")) {
-            Toast.makeText(this, "Please Select a Valid Grade", Toast.LENGTH_SHORT).show();
+            sp2.setVisibility(View.INVISIBLE);
+            return;
         } else {
-            grade = parent.getItemAtPosition(position).toString();
-        }
-        if (sp4.getSelectedItem().toString().equalsIgnoreCase("Select a Reason")) {
-            Toast.makeText(this, "Please Select a Valid Reason", Toast.LENGTH_LONG).show();
-        } else {
-            reason.setText(parent.getItemAtPosition(position).toString());
+            Toast.makeText(this, "Please Select a Valid Role", Toast.LENGTH_SHORT).show();
+            return;
         }
     }
 

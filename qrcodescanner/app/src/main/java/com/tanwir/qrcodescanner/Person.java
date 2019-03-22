@@ -6,6 +6,9 @@ public class Person {
     private String grade;
     private String name;
     private String reason;
+    private boolean tardy;
+    private String time;
+    private String comments;
 
     public Person(String date, String role, String grade, String name, String reason, String time, String comments) {
         this.date = date;
@@ -16,9 +19,6 @@ public class Person {
         this.time = time;
         this.comments = comments;
     }
-
-    private String time;
-    private String comments;
 
     public Person() {
         this.role = null;
@@ -94,6 +94,15 @@ public class Person {
     public void setComments(String comments) {
         this.comments = comments;
     }
+
+    public boolean isTardy() {
+        return tardy;
+    }
+
+    public void setTardy(boolean tardy) {
+        this.tardy = tardy;
+    }
+
 
     public String toString() {
         StringBuilder sb = new StringBuilder();

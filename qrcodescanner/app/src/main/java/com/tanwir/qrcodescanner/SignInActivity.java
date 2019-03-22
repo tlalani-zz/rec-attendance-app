@@ -2,14 +2,18 @@ package com.tanwir.qrcodescanner;
 
 import android.content.Intent;
 import android.os.Bundle;
-import android.support.annotation.NonNull;
-import android.support.v7.app.AlertDialog;
-import android.support.v7.app.AppCompatActivity;
+import androidx.annotation.NonNull;
+import androidx.appcompat.app.AlertDialog;
+import androidx.appcompat.app.AppCompatActivity;
+
+import android.text.InputType;
+import android.view.MotionEvent;
 import android.view.View;
 import android.widget.Button;
 import android.widget.CheckBox;
 import android.widget.CompoundButton;
 import android.widget.EditText;
+import android.widget.ProgressBar;
 
 import com.google.android.gms.tasks.OnCompleteListener;
 import com.google.android.gms.tasks.Task;
@@ -21,57 +25,50 @@ public class SignInActivity extends AppCompatActivity {
     private EditText email;
     private EditText password;
     private Button mLoginBtn;
-    private CheckBox rememberMe;
     private FirebaseAuth mAuth;
+    private ProgressBar pbar;
 
-    private FirebaseAuth.AuthStateListener mAuthListener;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_sign_in);
         mAuth = FirebaseAuth.getInstance();
-        mAuthListener = new FirebaseAuth.AuthStateListener() {
-            @Override
-            public void onAuthStateChanged(@NonNull FirebaseAuth firebaseAuth) {
-                if (firebaseAuth.getCurrentUser() != null) {
-                    startActivity(new Intent(SignInActivity.this, ScanActivity.class));
-                }
-            }
-        };
         email = (EditText) findViewById(R.id.email);
         password = (EditText) findViewById(R.id.password);
-        rememberMe = (CheckBox) findViewById(R.id.rememberMe);
-        rememberMe.setOnCheckedChangeListener(new CompoundButton.OnCheckedChangeListener() {
-            @Override
-            public void onCheckedChanged(CompoundButton compoundButton, boolean isChecked) {
-                if (isChecked) {
-                   changeLoginPrefs(false, email.getText().toString(), password.getText().toString());
-                } else {
-                    changeLoginPrefs(false, null, null);
-                }
-            }
-        });
         mLoginBtn = (Button) findViewById(R.id.loginButton);
-
+        pbar = (ProgressBar) findViewById(R.id.progressBar);
+        pbar.setVisibility(View.GONE);
         mLoginBtn.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View view) {
+                mLoginBtn.setVisibility(View.GONE);
+                pbar.setVisibility(View.VISIBLE);
+                pbar.setIndeterminate(true);
                 startSignIn();
             }
         });
     }
 
-    private void changeLoginPrefs(boolean shouldSave, String email, String password) {
+    @Override
+    protected void onResume() {
+        super.onResume();
+        mLoginBtn.setVisibility(View.VISIBLE);
+    }
+
+    private void changeLoginPrefs(boolean shouldSave, String email) {
+        //TO-DO Maybe? only for email tho.
     }
 
     private void startSignIn() {
-        String emailaddress = email.getText().toString();
+        String emailAddress = email.getText().toString();
         String pass = password.getText().toString();
-        mAuth.signInWithEmailAndPassword(emailaddress, pass).addOnCompleteListener(new OnCompleteListener<AuthResult>() {
+        mAuth.signInWithEmailAndPassword(emailAddress, pass).addOnCompleteListener(new OnCompleteListener<AuthResult>() {
             @Override
             public void onComplete(@NonNull Task<AuthResult> task) {
+                pbar.setVisibility(View.GONE);
                 if(!task.isSuccessful()) {
+                    mLoginBtn.setVisibility(View.VISIBLE);
                     createLoginFailureDialog("Sign In Error", "Unable to Sign In, Please check your email or password");
                 } else {
                     startActivity(new Intent(SignInActivity.this, ScanActivity.class));
