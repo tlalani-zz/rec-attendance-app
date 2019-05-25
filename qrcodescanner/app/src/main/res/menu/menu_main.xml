@@ -8,4 +8,7 @@
     <item
         android:id="@+id/save"
         android:title="@string/save_string" />
+    <item
+        android:id="@+id/manual"
+        android:title="Manual Entry" />
 </menu>

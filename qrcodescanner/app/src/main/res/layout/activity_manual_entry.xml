@@ -80,10 +80,10 @@
         android:textColorHint="@android:color/white"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toBottomOf="@+id/spinner4" />
+        app:layout_constraintTop_toBottomOf="@+id/reasonSelect" />
 
     <Spinner
-        android:id="@+id/spinner4"
+        android:id="@+id/reasonSelect"
         android:layout_width="368dp"
         android:layout_height="wrap_content"
         android:layout_marginStart="8dp"
@@ -91,47 +91,37 @@
         android:layout_marginEnd="8dp"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toBottomOf="@+id/textInputLayout4" />
+        app:layout_constraintTop_toBottomOf="@+id/date" />
 
-    <com.google.android.material.textfield.TextInputLayout
-        android:id="@+id/textInputLayout4"
-        android:layout_width="0dp"
-        android:layout_height="wrap_content"
+    <TextView
+        android:id="@+id/date"
+        android:layout_width="156dp"
+        android:layout_height="46dp"
         android:layout_marginStart="8dp"
-        android:layout_marginTop="32dp"
         android:layout_marginEnd="8dp"
-        android:textColorHint="@android:color/white"
+        android:background="@drawable/tv_background_1"
+        android:text="Date"
+        android:textAlignment="center"
+        android:textSize="32sp"
+        app:layout_constraintBaseline_toBaselineOf="@+id/time"
         app:layout_constraintEnd_toStartOf="@+id/guideline"
-        app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toBottomOf="@+id/name">
+        app:layout_constraintStart_toStartOf="parent" />
 
-        <com.google.android.material.textfield.TextInputEditText
-            android:id="@+id/date"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:hint="Date"
-            android:textColor="@android:color/white"
-            android:textColorHint="@android:color/white" />
-    </com.google.android.material.textfield.TextInputLayout>
-
-    <com.google.android.material.textfield.TextInputLayout
-        android:layout_width="0dp"
-        android:layout_height="wrap_content"
+    <TextView
+        android:id="@+id/time"
+        android:layout_width="156dp"
+        android:layout_height="46dp"
         android:layout_marginStart="8dp"
-        android:layout_marginTop="32dp"
+        android:layout_marginTop="8dp"
         android:layout_marginEnd="8dp"
-        android:textColorHint="@android:color/white"
+        android:layout_marginBottom="8dp"
+        android:background="@drawable/tv_background_1"
+        android:text="Time"
+        android:textAlignment="center"
+        android:textSize="32sp"
+        app:layout_constraintBottom_toTopOf="@+id/reasonSelect"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="@+id/guideline"
-        app:layout_constraintTop_toBottomOf="@+id/name">
-
-        <com.google.android.material.textfield.TextInputEditText
-            android:id="@+id/time"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:hint="Time"
-            android:textColor="@android:color/white"
-            android:textColorHint="@android:color/white" />
-    </com.google.android.material.textfield.TextInputLayout>
+        app:layout_constraintTop_toBottomOf="@+id/name" />
 
 </androidx.constraintlayout.widget.ConstraintLayout>

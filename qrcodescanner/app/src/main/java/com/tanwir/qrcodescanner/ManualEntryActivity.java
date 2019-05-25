@@ -22,9 +22,9 @@ import java.util.Calendar;
 import java.util.Date;
 
 public class ManualEntryActivity extends AppCompatActivity implements AdapterView.OnItemSelectedListener {
-    private Spinner sp1;
-    private Spinner sp2;
-    private Spinner sp4;
+    private Spinner roleDropdown;
+    private Spinner gradeDropdown;
+    private Spinner reasonDropdown;
     private EditText et;
     private TextView time;
     private TextView dates;
@@ -43,14 +43,15 @@ public class ManualEntryActivity extends AppCompatActivity implements AdapterVie
     DatabaseReference mgmtRef;
     DatabaseReference supportRef;
     DatabaseReference teacherRef;
+    private Person p = new Person();
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_manual_entry);
-        sp1 = findViewById(R.id.roleSelect);
-        sp2 = findViewById(R.id.gradeSelect);
-        sp4 = findViewById(R.id.spinner4);
+        roleDropdown = findViewById(R.id.roleSelect);
+        gradeDropdown = findViewById(R.id.gradeSelect);
+        reasonDropdown = findViewById(R.id.reasonSelect);
         et = findViewById(R.id.name);
         time = findViewById(R.id.time);
         dates = findViewById(R.id.date);
@@ -58,13 +59,12 @@ public class ManualEntryActivity extends AppCompatActivity implements AdapterVie
         ArrayAdapter<CharSequence> roles = ArrayAdapter.createFromResource(this, R.array.roles, android.R.layout.simple_spinner_dropdown_item);
         ArrayAdapter<CharSequence> grades = ArrayAdapter.createFromResource(this, R.array.grades, android.R.layout.simple_spinner_dropdown_item);
         ArrayAdapter<CharSequence> reasons = ArrayAdapter.createFromResource(this, R.array.reasons, android.R.layout.simple_spinner_dropdown_item);
-        sp1.setAdapter(roles);
-        sp2.setAdapter(grades);
-        sp4.setAdapter(reasons);
-        sp2.setVisibility(View.INVISIBLE);
-        sp1.setOnItemSelectedListener(this);
-        sp2.setOnItemSelectedListener(this);
-        sp4.setOnItemSelectedListener(this);
+        roleDropdown.setAdapter(roles);
+        gradeDropdown.setAdapter(grades);
+        reasonDropdown.setAdapter(reasons);
+        roleDropdown.setOnItemSelectedListener(this);
+        gradeDropdown.setOnItemSelectedListener(this);
+        reasonDropdown.setOnItemSelectedListener(this);
         dates.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
@@ -115,82 +115,20 @@ public class ManualEntryActivity extends AppCompatActivity implements AdapterVie
         });
     }
 
-    public void doEntry(View v) throws Exception {
-        String currentTime;
-        date = new Date();
-        inputDate = DateFormat.getDateInstance(DateFormat.LONG).format(date);
-        if(dates.getText() != null) {
-            if(!dates.getText().toString().isEmpty()) {
-                inputDate = dates.getText().toString();
-            }
-        }
-        if (time.getText() != null) {
-            if (!time.getText().toString().isEmpty()) {
-                currentTime = time.getText().toString();
-            } else
-                currentTime = DateFormat.getTimeInstance().format(date);
-        } else
-            currentTime = DateFormat.getTimeInstance().format(date);
-        if (role != null) {
-            if (et.getText() != null) {
-                if (!et.getText().toString().isEmpty()) {
-                    if (role.equals("Student")) {
-                        if (grade != null) {
-                            studentRef = mRootRef.child(inputDate).child(role).child(grade).child(et.getText().toString());
-                            studentRef.child("Time").setValue(currentTime);
-                            if (reason.getText() != null) {
-                                if (!sp4.getSelectedItem().toString().equalsIgnoreCase("Select a Reason")) {
-                                    studentRef.child("Reason").setValue(sp4.getSelectedItem().toString());
-                                }
-                                if(reason.getText() != null && !reason.getText().toString().isEmpty())
-                                    studentRef.child("Comments").setValue(reason.getText().toString());
-                            }
-                            studentRef = null;
-                            et.setText("");
-                            time.setText("");
-                            reason.setText("");
-                            Toast.makeText(this, "Sent Successfully", Toast.LENGTH_SHORT).show();
-                        } else {
-                            Toast.makeText(this, "Please Select A Valid Grade", Toast.LENGTH_SHORT).show();
-                        }
-                    } else {
-                        mgmtRef = mRootRef.child(inputDate).child(role).child(et.getText().toString());
-                        mgmtRef.child("Time").setValue(currentTime);
-                        if (reason.getText() != null) {
-                            if (!reason.getText().toString().isEmpty()) {
-                                mgmtRef.child("Reason").setValue(reason.getText().toString());
-                            }
-                        }
-                        mgmtRef = null;
-                        et.setText("");
-                        time.setText("");
-                        reason.setText("");
-                        Toast.makeText(this, "Sent Successfully", Toast.LENGTH_SHORT).show();
-                    }
-                } else {
-                    Toast.makeText(this, "Please Enter a Name", Toast.LENGTH_SHORT).show();
-                }
-            } else {
-                Toast.makeText(this, "Please Enter a Name", Toast.LENGTH_SHORT).show();
-            }
-        } else {
-            Toast.makeText(this, "Please Select A Valid Role", Toast.LENGTH_SHORT).show();
-        }
+    public void doEntry(View v) {
+        v.setBackground(getDrawable(R.drawable.balaj));
     }
 
     @Override
     public void onItemSelected(AdapterView<?> parent, View view, int position, long id) {
-        if (!parent.getItemAtPosition(position).toString().equals(roles[0])) {
-            role = parent.getItemAtPosition(position).toString();
-            if (role.equals(roles[1])) {
-                sp2.setVisibility(View.VISIBLE);
-                return;
+        if(position != 0) {
+            if (parent.getId() == reasonDropdown.getId()) {
+                p.setReason(reasonDropdown.getItemAtPosition(position).toString());
+            } else if (parent.getId() == gradeDropdown.getId()) {
+                p.setGrade(gradeDropdown.getItemAtPosition(position).toString());
+            } else if (parent.getId() == roleDropdown.getId()) {
+                p.setRole(roleDropdown.getItemAtPosition(position).toString());
             }
-            sp2.setVisibility(View.INVISIBLE);
-            return;
-        } else {
-            Toast.makeText(this, "Please Select a Valid Role", Toast.LENGTH_SHORT).show();
-            return;
         }
     }
 

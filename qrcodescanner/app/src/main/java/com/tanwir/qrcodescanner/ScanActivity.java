@@ -22,9 +22,6 @@ import android.view.MenuInflater;
 import android.view.MenuItem;
 import android.view.View;
 import android.widget.Button;
-import android.widget.EditText;
-import android.widget.Spinner;
-import android.widget.TextView;
 import android.widget.Toast;
 
 import com.blikoon.qrcodescanner.QrCodeActivity;
@@ -42,6 +39,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.io.OutputStreamWriter;
+import java.nio.charset.StandardCharsets;
 import java.text.DateFormat;
 import java.util.ArrayList;
 import java.util.Calendar;
@@ -51,20 +49,18 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.Map;
+import java.util.Objects;
 
 public class ScanActivity extends AppCompatActivity {
     private static final int REQUEST_CODE_QR_SCAN = 101;
     private static final int REQUEST_TARDY_INFORMATION = 102;
     private static final String SCAN = "SCAN";
     private static final String SEND = "SEND";
-    private TextView tardyText;
-    private EditText tardyComments;
     private Button scanButton;
     private String todayDate;
     private String schoolYear;
     private Person personScanned;
     private Calendar calendar;
-    private Spinner tardyReason;
     private HashMap<String, ArrayList<Person>> allPeople;
     private HashSet<Person> savedPeople = new HashSet<>();
 
@@ -86,21 +82,21 @@ public class ScanActivity extends AppCompatActivity {
         scanButton = findViewById(R.id.btn_scan);
 
         checkPermissions();
-        if (checkInternet()) {
+        if (connectedToInternet()) {
             if (!rosterExists()) {
                 downloadRoster();
             }
             readAndUpdateRoster();
             readAndAddStudentsFromFile();
         } else {
-            alertDialogCreator("No Internet", "Unable to connect to Internet, cannot update or download roster, please turn internet on to update attendance.");
+            createAlertDialogWithTitleAndMessage("No Internet", "Unable to connect to Internet, cannot update or download attendance roster, please connect to internet to update attendance.");
         }
     }
 
     public boolean onCreateOptionsMenu(Menu menu) {
 
         MenuInflater inflater = getMenuInflater();
-        inflater.inflate(R.menu.menu_scan, menu);
+        inflater.inflate(R.menu.menu_main, menu);
         return true;
     }
 
@@ -111,6 +107,9 @@ public class ScanActivity extends AppCompatActivity {
                 return true;
             case R.id.save:
                 readAndAddStudentsFromFile();
+                return true;
+            case R.id.manual:
+                startActivity(new Intent(this, ManualEntryActivity.class));
                 return true;
             default:
                 return super.onOptionsItemSelected(item);
@@ -141,8 +140,7 @@ public class ScanActivity extends AppCompatActivity {
     }
 
     @Override
-    public void onRequestPermissionsResult(int requestCode,
-                                           @NonNull String permissions[], @NonNull int[] grantResults) {
+    public void onRequestPermissionsResult(int requestCode, @NonNull String permissions[], @NonNull int[] grantResults) {
         if (requestCode == 12) {
             // If request is cancelled, the result arrays are empty.
             if (grantResults.length > 0
@@ -174,15 +172,291 @@ public class ScanActivity extends AppCompatActivity {
         }
     }
 
-    public boolean sendToDatabase(boolean fromFile) {
+    public boolean connectedToInternet() {
+        ConnectivityManager a = (ConnectivityManager) getSystemService(Context.CONNECTIVITY_SERVICE);
+        try {
+            NetworkInfo networkInfo = a.getActiveNetworkInfo();
+            if (!networkInfo.isConnectedOrConnecting()) {
+                return false;
+            } else {
+                return true;
+            }
+        } catch (NullPointerException e) {
+            return false;
+        }
+    }
+
+    public void setFirebaseRefs() {
+        studentRef = dateRef.child("Student");
+        mgmtRef = dateRef.child("Management");
+        supportRef = dateRef.child("Intern");
+        teacherRef = dateRef.child("Teacher");
+    }
+
+    public void downloadRoster() {
+        DatabaseReference rosterRef = mRootRef.child("People");
+        Query q = rosterRef.orderByKey();
+        final HashMap<String, ArrayList<Person>> people = initializeMap();
+        q.addListenerForSingleValueEvent(new ValueEventListener() {
+            @Override
+            public void onDataChange(@NonNull DataSnapshot dataSnapshot) {
+                Log.d("TAG", "onDataChange: Downloading Roster");
+                for (DataSnapshot role : dataSnapshot.getChildren()) {
+                    if (!("Student").equals(role.getKey())) {
+                        for (DataSnapshot name : role.getChildren()) {
+                            if (name.getValue() != null) {
+                                Person p = new Person(role.getKey(), name.getValue().toString(), null, null);
+                                Objects.requireNonNull(people.get(role.getKey())).add(p);
+                            }
+                        }
+
+                    } else {
+                        for (DataSnapshot grade : role.getChildren()) {
+                            for (DataSnapshot name : grade.getChildren()) {
+                                if (name.getValue() != null) {
+                                    Person p = new Person(role.getKey(), grade.getKey(), name.getValue().toString(), null, null);
+                                    Objects.requireNonNull(people.get(role.getKey())).add(p);
+                                }
+                            }
+                        }
+                    }
+                }
+                saveRoster(people);
+            }
+
+            @Override
+            public void onCancelled(@NonNull DatabaseError databaseError) {
+
+            }
+        });
+    }
+
+    public HashMap<String, ArrayList<Person>> initializeMap() {
+        HashMap<String, ArrayList<Person>> map = new HashMap<>();
+        String[] roles = getString(R.string.roles).split(":");
+        for (String s : roles) {
+            map.put(s, new ArrayList<Person>());
+        }
+        return map;
+    }
+
+    public void readAndUpdateRoster() {
+        if (rosterExists()) {
+            try {
+                InputStream is = openFileInput(getString(R.string.roster_file_name));
+                JsonReader reader = new JsonReader(new InputStreamReader(is, StandardCharsets.UTF_8));
+                allPeople = initializeMap();
+                reader.beginObject();
+                while (reader.hasNext()) {
+                    String role = reader.nextName();
+                    reader.beginArray();
+                    while (reader.hasNext()) {
+                        Person p = new Person();
+                        reader.beginObject();
+                        while (reader.hasNext()) {
+                            p.setRole(role);
+                            String name = reader.nextName();
+                            switch (name) {
+                                case "Name":
+                                    p.setName(reader.nextString());
+                                    break;
+                                case "Grade":
+                                    p.setGrade(reader.nextString());
+                                    break;
+                            }
+                        }
+                        reader.endObject();
+                        Objects.requireNonNull(allPeople.get(role)).add(p);
+                    }
+                    reader.endArray();
+                }
+                reader.endObject();
+                reader.close();
+            } catch (IOException e) {
+                Toast.makeText(this, "Something Went Wrong", Toast.LENGTH_SHORT).show();
+            }
+        }
+    }
+
+    public void saveRoster(HashMap<String, ArrayList<Person>> people) {
+        try {
+            FileOutputStream os = openFileOutput(getString(R.string.roster_file_name), Context.MODE_PRIVATE);
+            JsonWriter writer = new JsonWriter(new OutputStreamWriter(os, StandardCharsets.UTF_8));
+            writer.setIndent(" ");
+            writer.beginObject();
+            for (Map.Entry<String, ArrayList<Person>> entry : people.entrySet()) {
+                writer.name(entry.getKey());
+                writer.beginArray();
+                for (Person p : entry.getValue()) {
+                    writer.beginObject();
+                    writer.name("Name").value(p.getName());
+                    if (p.getRole().equals("Student"))
+                        writer.name("Grade").value(p.getGrade());
+                    writer.endObject();
+                }
+                writer.endArray();
+            }
+            writer.endObject();
+            writer.close();
+            readAndUpdateRoster();
+        } catch (Exception e) {
+            createAlertDialogWithTitleAndMessage("Could Not Save Roster", "If the roster is not saved, " +
+                    "attendance will not be updated. Please go to menu and download the roster for attendance to update.");
+            e.printStackTrace();
+        }
+    }
+
+    public String formatSchoolYearFromString(String day) {
+        String[] date = day.split(" ");
+        String[] months = getString(R.string.months).split(":");
+        int year = Integer.parseInt(date[2]);
+        for (String s : months) {
+            if (s.equals(date[0])) {
+                return "" + year + "-" + (year + 1);//ex. year = 2018 and month is august --> 2018-2019
+            }
+        }
+        return "" + (year - 1) + "-" + year;//ex. year = 2019 and month is february --> 2018-2019
+    }
+
+    public String formatSchoolYearFromDateObject(Date date) {
+        calendar.setTime(date);
+        int month = calendar.get(Calendar.MONTH);
+        int year = calendar.get(Calendar.YEAR);
+        if (month >= 8) {
+            return "" + year + "-" + (year + 1);
+        } else {
+            return "" + (year - 1) + "-" + year;
+        }
+    }
+
+    public void writeStudentToFile(OutputStreamWriter osw, Person p) {
+        try {
+            osw.write(p.toString());
+        } catch (Exception e) {
+            createAlertDialogWithTitleAndMessage("Unexpected Error", "Could not save student for later retrieval. Please try again.");
+        }
+    }
+
+    public boolean rosterExists() {
+        return new File(getFilesDir() + "/" + getString(R.string.roster_file_name)).exists();
+    }
+
+    public long peopleNotSaved() {
+        File file = new File(getFilesDir() + "/" + getString(R.string.file_name));
+        if (file.exists() && file.length() > 0) {
+            return file.length();
+        }
+        return 0L;
+    }
+
+    public Person searchForStudentInMap(String[] options) {
+        if (allPeople.get(options[0]) != null) {
+            for (Person p : Objects.requireNonNull(allPeople.get(options[0]))) {
+                if (p.getName().equals(options[1])) {
+                    return p;
+                }
+            }
+        }
+        createAlertDialogWithTitleAndMessage("Person Not Found", "" + options[1] + "Not found.\n Re-Download Roster and try again if person was recently added.");
+        return null;
+    }
+
+    public boolean personIsTardy(int hour, int minute) {
+        return (calendar.get(Calendar.HOUR_OF_DAY) > hour) || (calendar.get(Calendar.HOUR_OF_DAY) == hour && calendar.get(Calendar.MINUTE) > minute);
+    }
+
+    public void createAlertDialogWithTitleAndMessage(String title, String message) {
+        android.app.AlertDialog.Builder alertdialog = new android.app.AlertDialog.Builder(this);
+        alertdialog
+                .setTitle(title)
+                .setMessage(message)
+                .setCancelable(true);
+        android.app.AlertDialog d = alertdialog.create();
+        d.show();
+    }
+
+    protected void onActivityResult(int requestCode, int resultCode, Intent data) {
+        if (resultCode != Activity.RESULT_OK) {
+            if(requestCode == REQUEST_CODE_QR_SCAN)
+                createAlertDialogWithTitleAndMessage("Scan Error", "Unable to Scan QR Code");
+            else if(requestCode == REQUEST_TARDY_INFORMATION) {
+                createAlertDialogWithTitleAndMessage("Unable to add Tardy Information", "Tardy Information was unable to be added. Please try again.");
+            }
+        } else if (requestCode == REQUEST_CODE_QR_SCAN) {
+            if (data == null) return;
+            //Getting the passed result
+            String result = data.getStringExtra("com.blikoon.qrcodescanner.got_qr_scan_relult");
+            final String[] options = result.split(":");
+            for(int i = 0; i<options.length; i++) {
+                options[i] = options[i].trim();
+            }
+            if (options.length < 2) {
+                Toast.makeText(this, "Unable to parse QR Code. Try again or scan a different one", Toast.LENGTH_SHORT).show();
+                return;
+            }
+            String displayMessage = "Role: " + options[0] + "\n" + "Name: " + options[1];
+            AlertDialog alertDialog = new AlertDialog.Builder(ScanActivity.this).create();
+            alertDialog.setTitle("Is This You?");
+            alertDialog.setMessage(displayMessage);
+            alertDialog.setButton(AlertDialog.BUTTON_NEUTRAL, "Yes",
+                    new DialogInterface.OnClickListener() {
+                        public void onClick(DialogInterface dialog, int which) {
+                            Date date = new Date();
+                            schoolYear = formatSchoolYearFromDateObject(date);
+                            String time = DateFormat.getTimeInstance(DateFormat.SHORT).format(date);
+                            todayDate = DateFormat.getDateInstance().format(date);
+                            dateRef = mRootRef.child(schoolYear).child(todayDate);
+                            setFirebaseRefs();
+                            personScanned = searchForStudentInMap(options);
+                            personScanned.setTime(time);
+                            personScanned.setDate(todayDate);
+                            if ((personScanned.getRole().equals("Student") && (personIsTardy(10, 40))) || ((!personScanned.getRole().equals("Student")) && (personIsTardy(10, 0)))) {
+                                personScanned.setTardy(true);
+                                startActivityForResult(new Intent(ScanActivity.this, TardyActivity.class), REQUEST_TARDY_INFORMATION);
+                            } else {
+                                sendToDatabase(false);
+                            }
+                        }
+                    });
+            alertDialog.setButton(AlertDialog.BUTTON_NEGATIVE, "No", new DialogInterface.OnClickListener() {
+                @Override
+                public void onClick(DialogInterface dialog, int which) {
+                    Toast.makeText(ScanActivity.this, "Please Rescan your Code", Toast.LENGTH_SHORT).show();
+                    dialog.dismiss();
+                }
+            });
+            alertDialog.show();
+        } else if(requestCode == REQUEST_TARDY_INFORMATION) {
+            if (data == null) return;
+            String[] tardyInfo = data.getStringArrayExtra("tardyInfo");
+            personScanned.setReason(tardyInfo[0]);
+            if(tardyInfo[1] != null && !tardyInfo[1].isEmpty())
+                personScanned.setComments(tardyInfo[1]);
+            sendToDatabase(false);
+        }
+    }
+
+    @Override
+    protected void onStop() {
+        super.onStop();
+        //write to file here
+    }
+
+    @Override
+    protected void onResume() {
+        super.onResume();
+        //write to db here if internet
+    }
+
+    public boolean sendToDatabase(boolean sendingFromFile) {
         if (personScanned != null) {
             if (personScanned.getReason() == null && personScanned.isTardy()) {
                 Toast.makeText(this, "No Reason Selected, Please Select a Reason", Toast.LENGTH_SHORT).show();
                 return false;
             }
-            if (checkInternet()) {
-                if (fromFile) {
-                    schoolYear = setSchoolYearSaved(personScanned.getDate());
+            if (connectedToInternet()) {
+                if (sendingFromFile) {
+                    schoolYear = formatSchoolYearFromString(personScanned.getDate());
                     todayDate = personScanned.getDate();
                     dateRef = mRootRef.child(schoolYear).child(todayDate);
                     setFirebaseRefs();
@@ -228,7 +502,7 @@ public class ScanActivity extends AppCompatActivity {
                         break;
 
                     default:
-                        alertDialogCreator("Invalid Post", "Data was sent incorrectly, Please try Again");
+                        createAlertDialogWithTitleAndMessage("Invalid Post", "Data was sent incorrectly, Please try Again");
                         return false;
                 }
                 return true;
@@ -239,261 +513,14 @@ public class ScanActivity extends AppCompatActivity {
                 return false;
             }
         }
-        alertDialogCreator("Error", "Something went wrong try again");
+        createAlertDialogWithTitleAndMessage("Error", "Something went wrong try again");
         return false;
     }
 
-    protected void onActivityResult(int requestCode, int resultCode, Intent data) {
-        if (resultCode != Activity.RESULT_OK) {
-            if (data == null)
-                return;
-            //Getting the passed result
-            String result = data.getStringExtra("com.blikoon.qrcodescanner.error_decoding_image");
-            if (result != null) {
-                AlertDialog alertDialog = new AlertDialog.Builder(ScanActivity.this).create();
-                alertDialog.setTitle("Scan Error");
-                alertDialog.setMessage("Error in Scanned value: " + result);
-                alertDialog.setButton(AlertDialog.BUTTON_NEUTRAL, "OK",
-                        new DialogInterface.OnClickListener() {
-                            public void onClick(DialogInterface dialog, int which) {
-                                dialog.dismiss();
-                            }
-                        });
-                alertDialog.show();
-            }
-            alertDialogCreator("Scan Error", "Unable to Scan QR Code");
-        } else if (requestCode == REQUEST_CODE_QR_SCAN) {
-            if (data == null) return;
-            //Getting the passed result
-            String result = data.getStringExtra("com.blikoon.qrcodescanner.got_qr_scan_relult");
-            final String[] options = result.split(":");
-            for(int i = 0; i<options.length; i++) {
-                options[i] = options[i].trim();
-            }
-            if (options.length < 2) {
-                Toast.makeText(this, "Unable to parse QR Code. Try again or scan a different one", Toast.LENGTH_SHORT).show();
-                return;
-            }
-            StringBuilder displayMessage = new StringBuilder();
-            displayMessage.append("Role: " + options[0] + "\n" + "Name: " + options[1]);
-            AlertDialog alertDialog = new AlertDialog.Builder(ScanActivity.this).create();
-            alertDialog.setTitle("Is This You?");
-            alertDialog.setMessage(displayMessage.toString());
-            alertDialog.setButton(AlertDialog.BUTTON_NEUTRAL, "Yes",
-                    new DialogInterface.OnClickListener() {
-                        public void onClick(DialogInterface dialog, int which) {
-                            Date date = new Date();
-                            schoolYear = setSchoolYear(date);
-                            String time = DateFormat.getTimeInstance(DateFormat.SHORT).format(date);
-                            todayDate = DateFormat.getDateInstance().format(date);
-                            dateRef = mRootRef.child(schoolYear).child(todayDate);
-                            setFirebaseRefs();
-                            personScanned = searchForStudentInMap(options);
-                            personScanned.setTime(time);
-                            personScanned.setDate(todayDate);
-                            if ((personScanned.getRole().equals("Student") && (personIsTardy(10, 40)) || personIsTardy(10, 0))) {
-                                personScanned.setTardy(true);
-                                startActivityForResult(new Intent(ScanActivity.this, TardyActivity.class), REQUEST_TARDY_INFORMATION);
-                            } else {
-                                if (sendToDatabase(false))
-                                    Toast.makeText(ScanActivity.this, "Successfully sent to Database", Toast.LENGTH_SHORT).show();
-                            }
-                        }
-                    });
-            alertDialog.setButton(AlertDialog.BUTTON_NEGATIVE, "No", new DialogInterface.OnClickListener() {
-                @Override
-                public void onClick(DialogInterface dialog, int which) {
-                    Toast.makeText(ScanActivity.this, "Please Rescan your Code", Toast.LENGTH_SHORT).show();
-                    dialog.dismiss();
-                }
-            });
-            alertDialog.show();
-        } else if(requestCode == REQUEST_TARDY_INFORMATION) {
-            if (data == null) return;
-            String[] tardyInfo = data.getStringArrayExtra("tardyInfo");
-            personScanned.setReason(tardyInfo[0]);
-            if(tardyInfo[1] != null && !tardyInfo[1].isEmpty())
-                personScanned.setComments(tardyInfo[1]);
-            sendToDatabase(false);
-        }
-    }
-
-    public String setSchoolYearSaved(String day) {
-        String[] date = day.split(" ");
-        String[] months = getString(R.string.months).split(":");
-        int year = Integer.parseInt(date[2]);
-        for (String s : months) {
-            if (s.equals(date[0])) {
-                return "" + year + "-" + (year + 1);//ex. year = 2018 and month is august --> 2018-2019
-            }
-        }
-        return "" + (year - 1) + "-" + year;//ex. year = 2019 and month is february --> 2018-2019
-    }
-
-    public String setSchoolYear(Date date) {
-        calendar.setTime(date);
-        int month = calendar.get(Calendar.MONTH);
-        int year = calendar.get(Calendar.YEAR);
-        if (month >= 8) {
-            return "" + year + "-" + (year + 1);
-        } else {
-            return "" + (year - 1) + "-" + year;
-        }
-    }
-
-    public void alertDialogCreator(String t, String m) {
-        android.app.AlertDialog.Builder alertdialog = new android.app.AlertDialog.Builder(this);
-        alertdialog
-                .setTitle(t)
-                .setMessage(m)
-                .setCancelable(true);
-        android.app.AlertDialog d = alertdialog.create();
-        d.show();
-    }
-
-    public boolean checkInternet() {
-        ConnectivityManager a = (ConnectivityManager) getSystemService(Context.CONNECTIVITY_SERVICE);
-        try {
-            NetworkInfo networkInfo = a.getActiveNetworkInfo();
-            if (!networkInfo.isConnectedOrConnecting()) {
-                return false;
-            } else {
-                return true;
-            }
-        } catch (NullPointerException e) {
-            return false;
-        }
-    }
-
-    public void setFirebaseRefs() {
-        studentRef = dateRef.child("Student");
-        mgmtRef = dateRef.child("Management");
-        supportRef = dateRef.child("Intern");
-        teacherRef = dateRef.child("Teacher");
-    }
-
-    public void showTardy() {
-        tardyText.setVisibility(View.VISIBLE);
-        tardyReason.setVisibility(View.VISIBLE);
-        scanButton.setText(SEND);
-    }
-
-    public void downloadRoster() {
-        DatabaseReference rosterRef = mRootRef.child("People");
-        Query q = rosterRef.orderByKey();
-        final HashMap<String, ArrayList<Person>> people = initializeMap();
-        q.addListenerForSingleValueEvent(new ValueEventListener() {
-            @Override
-            public void onDataChange(@NonNull DataSnapshot dataSnapshot) {
-                Log.d("TAG", "onDataChange: Downloading Roster");
-                for (DataSnapshot role : dataSnapshot.getChildren()) {
-                    if (!("Student").equals(role.getKey())) {
-                        for (DataSnapshot name : role.getChildren()) {
-                            if (name.getValue() != null) {
-                                Person p = new Person(role.getKey(), name.getValue().toString(), null, null);
-                                people.get(role.getKey()).add(p);
-                            }
-                        }
-
-                    } else {
-                        for (DataSnapshot grade : role.getChildren()) {
-                            for (DataSnapshot name : grade.getChildren()) {
-                                if (name.getValue() != null) {
-                                    Person p = new Person(role.getKey(), grade.getKey(), name.getValue().toString(), null, null);
-                                    people.get(role.getKey()).add(p);
-                                }
-                            }
-                        }
-                    }
-                }
-                saveRoster(people);
-            }
-
-            @Override
-            public void onCancelled(@NonNull DatabaseError databaseError) {
-
-            }
-        });
-    }
-
-    public HashMap<String, ArrayList<Person>> initializeMap() {
-        HashMap<String, ArrayList<Person>> map = new HashMap<>();
-        String[] roles = getString(R.string.roles).split(":");
-        for (String s : roles) {
-            map.put(s, new ArrayList<Person>());
-        }
-        return map;
-    }
-
-    public void readAndUpdateRoster() {
-        if (rosterExists()) {
-            try {
-                InputStream is = openFileInput(getString(R.string.roster_file_name));
-                JsonReader reader = new JsonReader(new InputStreamReader(is, "UTF-8"));
-                allPeople = initializeMap();
-                reader.beginObject();
-                while (reader.hasNext()) {
-                    String role = reader.nextName();
-                    reader.beginArray();
-                    while (reader.hasNext()) {
-                        Person p = new Person();
-                        reader.beginObject();
-                        while (reader.hasNext()) {
-                            p.setRole(role);
-                            String name = reader.nextName();
-                            switch (name) {
-                                case "Name":
-                                    p.setName(reader.nextString());
-                                    break;
-                                case "Grade":
-                                    p.setGrade(reader.nextString());
-                                    break;
-                            }
-                        }
-                        reader.endObject();
-                        allPeople.get(role).add(p);
-                    }
-                    reader.endArray();
-                }
-                reader.endObject();
-                reader.close();
-            } catch (IOException e) {
-                Toast.makeText(this, "Something Went Wrong", Toast.LENGTH_SHORT).show();
-            }
-        }
-    }
-
-    public void saveRoster(HashMap<String, ArrayList<Person>> people) {
-        try {
-            FileOutputStream os = openFileOutput(getString(R.string.roster_file_name), Context.MODE_PRIVATE);
-            JsonWriter writer = new JsonWriter(new OutputStreamWriter(os, "UTF-8"));
-            writer.setIndent(" ");
-            writer.beginObject();
-            for (Map.Entry<String, ArrayList<Person>> entry : people.entrySet()) {
-                writer.name(entry.getKey());
-                writer.beginArray();
-                for (Person p : entry.getValue()) {
-                    writer.beginObject();
-                    writer.name("Name").value(p.getName());
-                    if (p.getRole().equals("Student"))
-                        writer.name("Grade").value(p.getGrade());
-                    writer.endObject();
-                }
-                writer.endArray();
-            }
-            writer.endObject();
-            writer.close();
-            readAndUpdateRoster();
-        } catch (Exception e) {
-            alertDialogCreator("Could Not Save Roster", "If the roster is not saved, attendance will not be updated. Please go to menu and download the roster for attendance to update.");
-            e.printStackTrace();
-        }
-    }
-
     public void readAndAddStudentsFromFile() {
-        if (studentsNotSaved()) {
+        if (peopleNotSaved() > 0) {
             try {
-                String line = "";
+                String line;
                 InputStream is = openFileInput(getString(R.string.file_name));
                 InputStreamReader isr = new InputStreamReader(is);
                 BufferedReader reader = new BufferedReader(isr);
@@ -516,15 +543,14 @@ public class ScanActivity extends AppCompatActivity {
                         }
                     }
                 }
-                //in case some didn't go thru.
                 writeSavedStudentsToFile();
             } catch (Exception e) {
-                alertDialogCreator("IDK", "IDK WHATS GOING ON AAAAAAHHHHHH");
+                createAlertDialogWithTitleAndMessage("IDK", "IDK WHATS GOING ON AAAAAAHHHHHH");
             }
         }
     }
 
-    public void writeSavedStudentsToFile() {
+    public boolean writeSavedStudentsToFile() {
         try {
             FileOutputStream os = openFileOutput(getString(R.string.file_name), Context.MODE_PRIVATE);
             OutputStreamWriter osw = new OutputStreamWriter(os);
@@ -537,49 +563,19 @@ public class ScanActivity extends AppCompatActivity {
                     }
                 }
             } else {
-                if (!studentsNotSaved()) {
-                    new File(getFilesDir() + "/" + getString(R.string.file_name)).delete();
+                if (peopleNotSaved() == 0) {
+                    return new File(getFilesDir() + "/" + getString(R.string.file_name)).delete();
+                } else {
+                    return false;
                 }
             }
             osw.close();
 
         } catch (Exception e) {
             e.printStackTrace();
-            alertDialogCreator("Unexpected Error", "Could not save student for later retrieval. Please try again.");
+            createAlertDialogWithTitleAndMessage("Unexpected Error", "Could not save student for later retrieval. Please try again.");
         }
-    }
-
-    public void writeStudentToFile(OutputStreamWriter osw, Person p) {
-        try {
-            osw.write(p.toString());
-        } catch (Exception e) {
-            alertDialogCreator("Unexpected Error", "Could not save student for later retrieval. Please try again.");
-        }
-    }
-
-    public boolean rosterExists() {
-        return new File(getFilesDir() + "/" + getString(R.string.roster_file_name)).exists();
-    }
-
-    public boolean studentsNotSaved() {
-        File file = new File(getFilesDir() + "/" + getString(R.string.file_name));
-        return (file.exists() && file.length() > 0);
-    }
-
-    public Person searchForStudentInMap(String[] options) {
-        if (allPeople.get(options[0]) != null) {
-            for (Person p : allPeople.get(options[0])) {
-                if (p.getName().equals(options[1])) {
-                    return p;
-                }
-            }
-        }
-        alertDialogCreator("Person Not Found", "" + options[1] + "Not found.\n Re-Download Roster and try again if person was recently added.");
-        return null;
-    }
-
-    public boolean personIsTardy(int hour, int minute) {
-        return (calendar.get(Calendar.HOUR_OF_DAY) > hour) || (calendar.get(Calendar.HOUR_OF_DAY) == hour && calendar.get(Calendar.MINUTE) > minute);
+        return false;
     }
 
 }
