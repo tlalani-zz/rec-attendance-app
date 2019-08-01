@@ -41,6 +41,8 @@ import java.io.InputStreamReader;
 import java.io.OutputStreamWriter;
 import java.nio.charset.StandardCharsets;
 import java.text.DateFormat;
+import java.text.ParseException;
+import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Calendar;
 import java.util.Date;
@@ -50,6 +52,7 @@ import java.util.HashSet;
 import java.util.Iterator;
 import java.util.Map;
 import java.util.Objects;
+import java.util.concurrent.TimeUnit;
 
 public class ScanActivity extends AppCompatActivity {
     private static final int REQUEST_CODE_QR_SCAN = 101;
@@ -63,6 +66,7 @@ public class ScanActivity extends AppCompatActivity {
     private Calendar calendar;
     private HashMap<String, ArrayList<Person>> allPeople;
     private HashSet<Person> savedPeople = new HashSet<>();
+    private boolean isDownloaded = false;
 
     DatabaseReference mRootRef = FirebaseDatabase.getInstance().getReference();
     DatabaseReference personRef;
@@ -86,7 +90,7 @@ public class ScanActivity extends AppCompatActivity {
             if (!rosterExists()) {
                 downloadRoster();
             }
-            readAndUpdateRoster();
+            readRosterFromFile();
             readAndAddStudentsFromFile();
         } else {
             createAlertDialogWithTitleAndMessage("No Internet", "Unable to connect to Internet, cannot update or download attendance roster, please connect to internet to update attendance.");
@@ -176,11 +180,7 @@ public class ScanActivity extends AppCompatActivity {
         ConnectivityManager a = (ConnectivityManager) getSystemService(Context.CONNECTIVITY_SERVICE);
         try {
             NetworkInfo networkInfo = a.getActiveNetworkInfo();
-            if (!networkInfo.isConnectedOrConnecting()) {
-                return false;
-            } else {
-                return true;
-            }
+            return networkInfo.isConnectedOrConnecting();
         } catch (NullPointerException e) {
             return false;
         }
@@ -202,21 +202,22 @@ public class ScanActivity extends AppCompatActivity {
             public void onDataChange(@NonNull DataSnapshot dataSnapshot) {
                 Log.d("TAG", "onDataChange: Downloading Roster");
                 for (DataSnapshot role : dataSnapshot.getChildren()) {
-                    if (!("Student").equals(role.getKey())) {
-                        for (DataSnapshot name : role.getChildren()) {
-                            if (name.getValue() != null) {
-                                Person p = new Person(role.getKey(), name.getValue().toString(), null, null);
-                                Objects.requireNonNull(people.get(role.getKey())).add(p);
-                            }
-                        }
-
-                    } else {
+                    if (hasGrade(role.getKey())) {
                         for (DataSnapshot grade : role.getChildren()) {
                             for (DataSnapshot name : grade.getChildren()) {
                                 if (name.getValue() != null) {
-                                    Person p = new Person(role.getKey(), grade.getKey(), name.getValue().toString(), null, null);
+                                    //Person with role grade and name
+                                    Person p = new Person(role.getKey(), name.getValue().toString(), grade.getKey());
                                     Objects.requireNonNull(people.get(role.getKey())).add(p);
                                 }
+                            }
+                        }
+                    } else {
+                        for (DataSnapshot name : role.getChildren()) {
+                            if (name.getValue() != null) {
+                                //Person with only role and name.
+                                Person p = new Person(role.getKey(), name.getValue().toString(), null);
+                                Objects.requireNonNull(people.get(role.getKey())).add(p);
                             }
                         }
                     }
@@ -224,11 +225,16 @@ public class ScanActivity extends AppCompatActivity {
                 saveRoster(people);
             }
 
+
             @Override
             public void onCancelled(@NonNull DatabaseError databaseError) {
 
             }
         });
+    }
+
+    public boolean hasGrade(String s) {
+        return s != null && (s.equals("Student") || s.equals("Teacher"));
     }
 
     public HashMap<String, ArrayList<Person>> initializeMap() {
@@ -240,13 +246,26 @@ public class ScanActivity extends AppCompatActivity {
         return map;
     }
 
-    public void readAndUpdateRoster() {
+    public void readRosterFromFile() {
         if (rosterExists()) {
             try {
                 InputStream is = openFileInput(getString(R.string.roster_file_name));
                 JsonReader reader = new JsonReader(new InputStreamReader(is, StandardCharsets.UTF_8));
                 allPeople = initializeMap();
                 reader.beginObject();
+                reader.nextName();
+                SimpleDateFormat formatter = new SimpleDateFormat("MMM dd, yyyy");
+                try {
+                    Date date = formatter.parse(reader.nextString());
+                    long diff= TimeUnit.DAYS.convert(date.getTime() - new Date().getTime(), TimeUnit.MILLISECONDS);
+                    Log.d("James2", "readRosterFromFile: "+diff);
+                    if(diff > 30) {
+                        downloadRoster();
+                        return;
+                    }
+                } catch(ParseException pe) {
+                    pe.printStackTrace();
+                }
                 while (reader.hasNext()) {
                     String role = reader.nextName();
                     reader.beginArray();
@@ -273,6 +292,7 @@ public class ScanActivity extends AppCompatActivity {
                 reader.endObject();
                 reader.close();
             } catch (IOException e) {
+                e.printStackTrace();
                 Toast.makeText(this, "Something Went Wrong", Toast.LENGTH_SHORT).show();
             }
         }
@@ -284,13 +304,14 @@ public class ScanActivity extends AppCompatActivity {
             JsonWriter writer = new JsonWriter(new OutputStreamWriter(os, StandardCharsets.UTF_8));
             writer.setIndent(" ");
             writer.beginObject();
+            writer.name("Date").value(DateFormat.getDateInstance().format(new Date()));
             for (Map.Entry<String, ArrayList<Person>> entry : people.entrySet()) {
                 writer.name(entry.getKey());
                 writer.beginArray();
                 for (Person p : entry.getValue()) {
                     writer.beginObject();
                     writer.name("Name").value(p.getName());
-                    if (p.getRole().equals("Student"))
+                    if (p.getRole().equals("Student") || p.getRole().equals("Teacher"))
                         writer.name("Grade").value(p.getGrade());
                     writer.endObject();
                 }
@@ -298,7 +319,7 @@ public class ScanActivity extends AppCompatActivity {
             }
             writer.endObject();
             writer.close();
-            readAndUpdateRoster();
+            readRosterFromFile();
         } catch (Exception e) {
             createAlertDialogWithTitleAndMessage("Could Not Save Roster", "If the roster is not saved, " +
                     "attendance will not be updated. Please go to menu and download the roster for attendance to update.");
@@ -338,7 +359,8 @@ public class ScanActivity extends AppCompatActivity {
     }
 
     public boolean rosterExists() {
-        return new File(getFilesDir() + "/" + getString(R.string.roster_file_name)).exists();
+        File f = new File(getFilesDir() + "/" + getString(R.string.roster_file_name));
+        return f.exists() && f.length() > 0;
     }
 
     public long peopleNotSaved() {
@@ -356,6 +378,8 @@ public class ScanActivity extends AppCompatActivity {
                     return p;
                 }
             }
+            createAlertDialogWithTitleAndMessage("Person Not Found", "" + options[1] + "Not found.\n Re-Download Roster and try again if person was recently added.");
+            return null;
         }
         createAlertDialogWithTitleAndMessage("Person Not Found", "" + options[1] + "Not found.\n Re-Download Roster and try again if person was recently added.");
         return null;
@@ -395,6 +419,7 @@ public class ScanActivity extends AppCompatActivity {
                 return;
             }
             String displayMessage = "Role: " + options[0] + "\n" + "Name: " + options[1];
+            displayMessage += options.length > 2 ? "\n" + "Grade" + options[2] : "";
             AlertDialog alertDialog = new AlertDialog.Builder(ScanActivity.this).create();
             alertDialog.setTitle("Is This You?");
             alertDialog.setMessage(displayMessage);
@@ -410,10 +435,12 @@ public class ScanActivity extends AppCompatActivity {
                             personScanned = searchForStudentInMap(options);
                             personScanned.setTime(time);
                             personScanned.setDate(todayDate);
-                            if ((personScanned.getRole().equals("Student") && (personIsTardy(10, 40))) || ((!personScanned.getRole().equals("Student")) && (personIsTardy(10, 0)))) {
+                            if ((personScanned.isStudentOrIntern() && (personIsTardy(10, 40))) || ((!personScanned.isStudentOrIntern()) && (personIsTardy(10, 10)))) {
                                 personScanned.setTardy(true);
+                                personScanned.setStatus(Person.Status.Tardy);
                                 startActivityForResult(new Intent(ScanActivity.this, TardyActivity.class), REQUEST_TARDY_INFORMATION);
                             } else {
+                                personScanned.setStatus(Person.Status.Present);
                                 sendToDatabase(false);
                             }
                         }
@@ -461,50 +488,39 @@ public class ScanActivity extends AppCompatActivity {
                     dateRef = mRootRef.child(schoolYear).child(todayDate);
                     setFirebaseRefs();
                 }
+                Log.d("ScanActivity", "sendToDatabase: "+personScanned);
                 switch (personScanned.getRole()) {
+                    case "Teacher":
+                        gradeRef = teacherRef.child(personScanned.getGrade());
+                        personRef = gradeRef.child(personScanned.getName());
+                        break;
+
                     case "Student":
                         gradeRef = studentRef.child(personScanned.getGrade());
                         personRef = gradeRef.child(personScanned.getName());
-                        personRef.child("Time").setValue(personScanned.getTime());
-                        if (personScanned.getReason() != null)
-                            personRef.child("Reason").setValue(personScanned.getReason());
-                        if (personScanned.getComments() != null)
-                            personRef.child("Comments").setValue(personScanned.getComments());
                         break;
 
                     case "Management":
                         personRef = mgmtRef.child(personScanned.getName());
-                        personRef.child("Time").setValue(personScanned.getTime());
-                        if (personScanned.getReason() != null)
-                            personRef.child("Reason").setValue(personScanned.getReason());
-                        if (personScanned.getComments() != null)
-                            personRef.child("Comments").setValue(personScanned.getComments());
                         break;
 
                     case "Intern":
                     case "Interns":
                     case "Support":
                         personRef = supportRef.child(personScanned.getName());
-                        personRef.child("Time").setValue(personScanned.getTime());
-                        if (personScanned.getReason() != null)
-                            personRef.child("Reason").setValue(personScanned.getReason());
-                        if (personScanned.getComments() != null)
-                            personRef.child("Comments").setValue(personScanned.getComments());
-                        break;
-
-                    case "Teacher":
-                        personRef = teacherRef.child(personScanned.getName());
-                        personRef.child("Time").setValue(personScanned.getTime());
-                        if (personScanned.getReason() != null)
-                            personRef.child("Reason").setValue(personScanned.getReason());
-                        if (personScanned.getComments() != null)
-                            personRef.child("Comments").setValue(personScanned.getComments());
                         break;
 
                     default:
                         createAlertDialogWithTitleAndMessage("Invalid Post", "Data was sent incorrectly, Please try Again");
                         return false;
                 }
+                personRef.child("Time").setValue(personScanned.getTime());
+                personRef.child("Status").setValue(personScanned.getStatus());
+                if (personScanned.getReason() != null) {
+                    personRef.child("Reason").setValue(personScanned.getReason());
+                }
+                if (personScanned.getComments() != null)
+                    personRef.child("Comments").setValue(personScanned.getComments());
                 return true;
             } else {
                 savedPeople.add(personScanned);
@@ -532,7 +548,7 @@ public class ScanActivity extends AppCompatActivity {
                             options[i] = null;
                         }
                     }
-                    savedPeople.add(new Person(options[0], options[1], options[2], options[3], options[5], options[4], options[6]));
+                    savedPeople.add(new Person(options[0], options[1], options[2], options[3], options[5], options[4], options[6], Person.Status.valueOf(options[7])));
                 }
                 if (savedPeople.size() > 0) {
                     Iterator it = savedPeople.iterator();

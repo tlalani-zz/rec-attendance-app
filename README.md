@@ -1,1 +1,1 @@
-Initial Repo Creation
+QR Code Scanner based on: https://github.com/blikoon/QRCodeScanner

@@ -9,8 +9,13 @@ public class Person {
     private boolean tardy;
     private String time;
     private String comments;
+    private Status status;
 
-    public Person(String date, String role, String grade, String name, String reason, String time, String comments) {
+    public enum Status {
+        Absent, Present, Tardy;
+    }
+
+    public Person(String date, String role, String grade, String name, String reason, String time, String comments, Status status) {
         this.date = date;
         this.role = role;
         this.grade = grade;
@@ -18,27 +23,37 @@ public class Person {
         this.reason = reason;
         this.time = time;
         this.comments = comments;
+        this.status = status;
     }
 
     public Person() {
         this.role = null;
     }
 
-    public Person(String role, String grade, String name, String date, String time) {
+    public Person(String role, String grade, String name, String date, String time, Status status) {
         this.role = role;
         this.grade = grade;
         this.name = name;
         this.date = date;
         this.time = time;
+        this.status = status;
     }
 
-    public Person(String role, String name, String date, String time) {
+    public Person(String role, String name, String date, String time, Status status) {
         this.role = role;
         this.grade = null;
         this.name = name;
         this.date = date;
         this.time = time;
+        this.status = status;
     }
+
+    public Person(String role, String name, String grade) {
+        this.role = role;
+        this.grade = grade;
+        this.name = name;
+    }
+
 
     public String getDate() {
         return date;
@@ -75,6 +90,10 @@ public class Person {
         return name;
     }
 
+    public Status getStatus() {
+        return this.status;
+    }
+
     public void setName(String name) {
         this.name = name;
     }
@@ -103,6 +122,14 @@ public class Person {
         this.tardy = tardy;
     }
 
+    public void setStatus(Status status) {
+        this.status = status;
+    }
+
+    public boolean isStudentOrIntern() {
+        return (this.role == "Student" || this.role == "Intern");
+    }
+
 
     public String toString() {
         StringBuilder sb = new StringBuilder();
@@ -112,7 +139,8 @@ public class Person {
         sb.append("#"+this.name);
         sb.append("#"+this.time);
         sb.append("#"+this.reason);
-        sb.append("#"+this.comments+"\n");
+        sb.append("#"+this.comments);
+        sb.append("#"+this.status+"\n");
         return sb.toString();
     }
 }
