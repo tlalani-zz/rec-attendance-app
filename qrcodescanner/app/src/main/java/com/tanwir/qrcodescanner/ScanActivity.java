@@ -101,6 +101,12 @@ public class ScanActivity extends AppCompatActivity {
         }
     }
 
+    public String getRosterFileName() {
+        String shift = currentConfig.re_shift.replace("/", "@");
+        return "roster#" + currentConfig.re_center + "#"+currentConfig.re_class + "#" + shift + ".json";
+    }
+
+
 
     public boolean onCreateOptionsMenu(Menu menu) {
 
@@ -240,7 +246,7 @@ public class ScanActivity extends AppCompatActivity {
     public void readRosterFromFile() {
         if (rosterExists()) {
             try {
-                InputStream is = openFileInput(getString(R.string.roster_file_name));
+                InputStream is = openFileInput(getRosterFileName());
                 JsonReader reader = new JsonReader(new InputStreamReader(is, StandardCharsets.UTF_8));
                 allPeople = initializeMap();
                 reader.beginObject();
@@ -290,7 +296,7 @@ public class ScanActivity extends AppCompatActivity {
 
     public void saveRoster(HashMap<String, ArrayList<Person>> people) {
         try {
-            FileOutputStream os = openFileOutput(getString(R.string.roster_file_name), Context.MODE_PRIVATE);
+            FileOutputStream os = openFileOutput(getRosterFileName(), Context.MODE_PRIVATE);
             JsonWriter writer = new JsonWriter(new OutputStreamWriter(os, StandardCharsets.UTF_8));
             writer.setIndent(" ");
             writer.beginObject();
@@ -351,7 +357,7 @@ public class ScanActivity extends AppCompatActivity {
     }
 
     public boolean rosterExists() {
-        File f = new File(getFilesDir() + "/" + getString(R.string.roster_file_name));
+        File f = new File(getFilesDir() + "/" + getRosterFileName());
         return f.exists() && f.length() > 0;
     }
 
