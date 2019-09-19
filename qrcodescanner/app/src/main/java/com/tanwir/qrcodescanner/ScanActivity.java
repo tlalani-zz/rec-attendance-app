@@ -59,25 +59,14 @@ import java.util.concurrent.TimeUnit;
 public class ScanActivity extends AppCompatActivity {
     private static final int REQUEST_CODE_QR_SCAN = 101;
     private static final int REQUEST_TARDY_INFORMATION = 102;
-    private static final String SCAN = "SCAN";
-    private static final String SEND = "SEND";
-    private Button scanButton;
     private String todayDate;
     private String schoolYear;
     private Person personScanned;
     private Calendar calendar;
     private HashMap<String, ArrayList<Person>> allPeople;
     private HashSet<Person> savedPeople = new HashSet<>();
-    private boolean isDownloaded = false;
-
-    DatabaseReference mRootRef = FirebaseDatabase.getInstance().getReference();
-    DatabaseReference personRef;
-    DatabaseReference dateRef;
-    DatabaseReference studentRef;
-    DatabaseReference gradeRef;
-    DatabaseReference mgmtRef;
-    DatabaseReference supportRef;
-    DatabaseReference teacherRef;
+    DatabaseReference dbRoot = FirebaseDatabase.getInstance().getReference();
+    public ReConfigs.ReCurrentConfig currentConfig;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -85,7 +74,12 @@ public class ScanActivity extends AppCompatActivity {
         setContentView(R.layout.activity_scan);
         calendar = GregorianCalendar.getInstance();
         calendar.setTime(new Date());
-
+        getCurrentConfig(getIntent());
+        dbRoot = dbRoot.child("REC/")
+                .child(currentConfig.re_center)
+                .child(currentConfig.re_class)
+                .child("Shifts/")
+                .child(currentConfig.re_shift);
         checkPermissions();
         if (connectedToInternet()) {
             if (!rosterExists()) {
@@ -97,6 +91,16 @@ public class ScanActivity extends AppCompatActivity {
             createAlertDialogWithTitleAndMessage("No Internet", "Unable to connect to Internet, cannot update or download attendance roster, please connect to internet to update attendance.");
         }
     }
+
+    public void getCurrentConfig(Intent i) {
+        if(i.hasExtra("center") && i.hasExtra("class") && i.hasExtra("shift")) {
+            currentConfig = new ReConfigs.ReCurrentConfig(i);
+        } else {
+            Toast.makeText(this, "Something went wrong. Please re-select your configurations", Toast.LENGTH_SHORT).show();
+            finish();
+        }
+    }
+
 
     public boolean onCreateOptionsMenu(Menu menu) {
 
@@ -180,16 +184,9 @@ public class ScanActivity extends AppCompatActivity {
         }
     }
 
-    public void setFirebaseRefs() {
-        studentRef = dateRef.child("Student");
-        mgmtRef = dateRef.child("Management");
-        supportRef = dateRef.child("Intern");
-        teacherRef = dateRef.child("Teacher");
-    }
-
     public void downloadRoster(Date date) {
         schoolYear = formatSchoolYearFromDateObject(date);
-        DatabaseReference rosterRef = mRootRef.child("People").child(schoolYear);
+        DatabaseReference rosterRef = dbRoot.child("People").child(schoolYear);
         Query q = rosterRef.orderByKey();
         final HashMap<String, ArrayList<Person>> people = initializeMap();
         q.addListenerForSingleValueEvent(new ValueEventListener() {
@@ -315,7 +312,7 @@ public class ScanActivity extends AppCompatActivity {
             readRosterFromFile();
         } catch (Exception e) {
             createAlertDialogWithTitleAndMessage("Could Not Save Roster", "If the roster is not saved, " +
-                    "attendance will not be updated. Please go to menu and download the roster for attendance to update.");
+                    "attendance will not be updated. Please go to menu and download the roster or give permissions.");
             e.printStackTrace();
         }
     }
@@ -452,56 +449,35 @@ public class ScanActivity extends AppCompatActivity {
     }
 
     public boolean sendToDatabase(boolean sendingFromFile) {
+        DatabaseReference currentRef = dbRoot.child("Dates");
         if (personScanned != null) {
-            if (personScanned.getReason() == null && personScanned.isTardy()) {
-                Toast.makeText(this, "No Reason Selected, Please Select a Reason", Toast.LENGTH_SHORT).show();
-                return false;
-            }
             if (connectedToInternet()) {
                 if (sendingFromFile) {
                     schoolYear = formatSchoolYearFromString(personScanned.getDate());
                     todayDate = personScanned.getDate();
-                    dateRef = mRootRef.child(schoolYear).child(todayDate);
-                    setFirebaseRefs();
                 }
-                Log.d("ScanActivity", "sendToDatabase: "+personScanned);
-                switch (personScanned.getRole()) {
-                    case "Teacher":
-                        gradeRef = teacherRef.child(personScanned.getGrade());
-                        personRef = gradeRef.child(personScanned.getName());
-                        break;
-
-                    case "Student":
-                        gradeRef = studentRef.child(personScanned.getGrade());
-                        personRef = gradeRef.child(personScanned.getName());
-                        break;
-
-                    case "Management":
-                        personRef = mgmtRef.child(personScanned.getName());
-                        break;
-
-                    case "Intern":
-                    case "Interns":
-                    case "Support":
-                        personRef = supportRef.child(personScanned.getName());
-                        break;
-
-                    default:
-                        createAlertDialogWithTitleAndMessage("Invalid Post", "Data was sent incorrectly, Please try Again");
-                        return false;
+                currentRef = currentRef.child(schoolYear).child(todayDate);
+                //Getting Reference
+                if(personScanned.hasGrade()) {
+                    currentRef = currentRef.child(personScanned.getRole())
+                                        .child(personScanned.getGrade()).child(personScanned.getName());
+                } else {
+                    currentRef = currentRef.child(personScanned.getRole()).child(personScanned.getName());
                 }
-                personRef.child("Time").setValue(personScanned.getTime());
-                personRef.child("Status").setValue(personScanned.getStatus());
+
+                //Send to DB Now
+                currentRef.child("Time").setValue(personScanned.getTime());
+                currentRef.child("Status").setValue(personScanned.getStatus());
                 if (personScanned.getReason() != null) {
-                    personRef.child("Reason").setValue(personScanned.getReason());
+                    currentRef.child("Reason").setValue(personScanned.getReason());
                 }
                 if (personScanned.getComments() != null)
-                    personRef.child("Comments").setValue(personScanned.getComments());
+                    currentRef.child("Comments").setValue(personScanned.getComments());
                 return true;
             } else {
                 savedPeople.add(personScanned);
                 writeSavedStudentsToFile();
-                Toast.makeText(this, "No Internet, Student saved to file, attendance not updated", Toast.LENGTH_SHORT).show();
+                Toast.makeText(this, "No Internet, Student saved locally, attendance not updated", Toast.LENGTH_SHORT).show();
                 return false;
             }
         }
@@ -537,7 +513,7 @@ public class ScanActivity extends AppCompatActivity {
                 }
                 writeSavedStudentsToFile();
             } catch (Exception e) {
-                createAlertDialogWithTitleAndMessage("IDK", "IDK WHATS GOING ON AAAAAAHHHHHH");
+                createAlertDialogWithTitleAndMessage("Error", "There was an error sending to database please try again.");
             }
         }
     }
