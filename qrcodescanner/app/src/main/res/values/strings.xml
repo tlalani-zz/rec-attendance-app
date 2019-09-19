@@ -5,7 +5,6 @@
     <string name="reason">Please Enter a Tardy Reason</string>
     <string name="reasonhint">Reason</string>
     <string name="send">Send</string>
-    <string name="roster_file_name">roster.json</string>
     <string name="file_name">studentSaved.txt</string>
     <string name="title_activity_login">Sign in</string>
     <string name="roles">Student:Teacher:Management:Intern</string>
