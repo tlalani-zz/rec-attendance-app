@@ -15,11 +15,11 @@ public class Person {
     private String comments;
     private Status status;
 
-    public enum Status {
+    enum Status {
         A, P, T;
     }
 
-    public Person(String date, String role, String grade, String name, String reason, String time, String comments, Status status) {
+    Person(String date, String role, String grade, String name, String reason, String time, String comments, Status status) {
         this.date = date;
         this.role = role;
         this.grade = grade;
@@ -30,26 +30,30 @@ public class Person {
         this.status = status;
     }
 
-    public Person() {
+    Person() {
         this.role = null;
     }
 
-    public Person(String role, String name, String grade) {
+    Person(String role, String name, String grade) {
         this.role = role;
         this.grade = grade;
         this.name = name;
     }
 
-    public boolean isTardy() {
+    boolean hasGrade() {
+        return this.grade != null;
+    }
+
+    boolean isTardy() {
         return tardy;
     }
 
-    public boolean isStudentOrIntern() {
+    boolean isStudentOrIntern() {
         return (this.role.equals("Student") || this.role.equals("Intern"));
     }
 
 
-    public String toFileString() {
+    String toFileString() {
         StringBuilder sb = new StringBuilder();
         sb.append(this.date);
         sb.append("#"+this.role);

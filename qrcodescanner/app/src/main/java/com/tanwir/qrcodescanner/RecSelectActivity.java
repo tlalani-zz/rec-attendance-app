@@ -165,6 +165,7 @@ public class RecSelectActivity extends AppCompatActivity implements AdapterView.
             String displayMessage = "RE Center: "+re_center + "\nRE Class: "+re_class+"\nRE_SHIFT: "+re_shift;
             AlertDialog d = createAlertDialogWithTitleAndMessage("Unable to Start Scan", "");
             d.setMessage("You have not selected one of these\n"+displayMessage);
+            d.show();
         }
     }
 
