@@ -1,5 +1,9 @@
 package com.tanwir.qrcodescanner;
 
+import lombok.Data;
+import lombok.NonNull;
+
+@Data
 public class Person {
     private String date;
     private String role;
@@ -12,7 +16,7 @@ public class Person {
     private Status status;
 
     public enum Status {
-        Absent, Present, Tardy;
+        A, P, T;
     }
 
     public Person(String date, String role, String grade, String name, String reason, String time, String comments, Status status) {
@@ -30,108 +34,22 @@ public class Person {
         this.role = null;
     }
 
-    public Person(String role, String grade, String name, String date, String time, Status status) {
-        this.role = role;
-        this.grade = grade;
-        this.name = name;
-        this.date = date;
-        this.time = time;
-        this.status = status;
-    }
-
-    public Person(String role, String name, String date, String time, Status status) {
-        this.role = role;
-        this.grade = null;
-        this.name = name;
-        this.date = date;
-        this.time = time;
-        this.status = status;
-    }
-
     public Person(String role, String name, String grade) {
         this.role = role;
         this.grade = grade;
         this.name = name;
     }
 
-
-    public String getDate() {
-        return date;
-    }
-
-    public void setDate(String date) {
-        this.date = date;
-    }
-    public String getTime() {
-        return time;
-    }
-
-    public void setTime(String time) {
-        this.time = time;
-    }
-
-    public String getRole() {
-        return role;
-    }
-
-    public void setRole(String role) {
-        this.role = role;
-    }
-
-    public String getGrade() {
-        return grade;
-    }
-
-    public void setGrade(String grade) {
-        this.grade = grade;
-    }
-
-    public String getName() {
-        return name;
-    }
-
-    public Status getStatus() {
-        return this.status;
-    }
-
-    public void setName(String name) {
-        this.name = name;
-    }
-
-    public String getReason() {
-        return reason;
-    }
-
-    public void setReason(String reason) {
-        this.reason = reason;
-    }
-
-    public String getComments() {
-        return comments;
-    }
-
-    public void setComments(String comments) {
-        this.comments = comments;
-    }
-
     public boolean isTardy() {
         return tardy;
     }
 
-    public void setTardy(boolean tardy) {
-        this.tardy = tardy;
-    }
-
-    public void setStatus(Status status) {
-        this.status = status;
-    }
-
     public boolean isStudentOrIntern() {
-        return (this.role == "Student" || this.role == "Intern");
+        return (this.role.equals("Student") || this.role.equals("Intern"));
     }
 
 
-    public String toString() {
+    public String toFileString() {
         StringBuilder sb = new StringBuilder();
         sb.append(this.date);
         sb.append("#"+this.role);

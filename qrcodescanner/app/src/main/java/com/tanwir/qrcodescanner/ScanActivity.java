@@ -21,7 +21,9 @@ import android.view.Menu;
 import android.view.MenuInflater;
 import android.view.MenuItem;
 import android.view.View;
+import android.widget.ArrayAdapter;
 import android.widget.Button;
+import android.widget.Spinner;
 import android.widget.Toast;
 
 import com.blikoon.qrcodescanner.QrCodeActivity;
@@ -83,12 +85,11 @@ public class ScanActivity extends AppCompatActivity {
         setContentView(R.layout.activity_scan);
         calendar = GregorianCalendar.getInstance();
         calendar.setTime(new Date());
-        scanButton = findViewById(R.id.btn_scan);
 
         checkPermissions();
         if (connectedToInternet()) {
             if (!rosterExists()) {
-                downloadRoster();
+                downloadRoster(new Date());
             }
             readRosterFromFile();
             readAndAddStudentsFromFile();
@@ -107,7 +108,7 @@ public class ScanActivity extends AppCompatActivity {
     public boolean onOptionsItemSelected(MenuItem item) {
         switch (item.getItemId()) {
             case R.id.roster:
-                downloadRoster();
+                downloadRoster(new Date());
                 return true;
             case R.id.save:
                 readAndAddStudentsFromFile();
@@ -165,15 +166,8 @@ public class ScanActivity extends AppCompatActivity {
     }
 
     public void doScan(View v) {
-        if (scanButton.getText().toString().equals(SCAN)) {
-            Intent intent = new Intent(ScanActivity.this, QrCodeActivity.class);
-            startActivityForResult(intent, REQUEST_CODE_QR_SCAN);
-        } else {
-            if (sendToDatabase(false)) {
-                Toast.makeText(this, "Successfully sent to Database", Toast.LENGTH_SHORT).show();
-                scanButton.setText(SCAN);
-            }
-        }
+        Intent intent = new Intent(ScanActivity.this, QrCodeActivity.class);
+        startActivityForResult(intent, REQUEST_CODE_QR_SCAN);
     }
 
     public boolean connectedToInternet() {
@@ -193,14 +187,14 @@ public class ScanActivity extends AppCompatActivity {
         teacherRef = dateRef.child("Teacher");
     }
 
-    public void downloadRoster() {
-        DatabaseReference rosterRef = mRootRef.child("People");
+    public void downloadRoster(Date date) {
+        schoolYear = formatSchoolYearFromDateObject(date);
+        DatabaseReference rosterRef = mRootRef.child("People").child(schoolYear);
         Query q = rosterRef.orderByKey();
         final HashMap<String, ArrayList<Person>> people = initializeMap();
         q.addListenerForSingleValueEvent(new ValueEventListener() {
             @Override
             public void onDataChange(@NonNull DataSnapshot dataSnapshot) {
-                Log.d("TAG", "onDataChange: Downloading Roster");
                 for (DataSnapshot role : dataSnapshot.getChildren()) {
                     if (hasGrade(role.getKey())) {
                         for (DataSnapshot grade : role.getChildren()) {
@@ -228,7 +222,7 @@ public class ScanActivity extends AppCompatActivity {
 
             @Override
             public void onCancelled(@NonNull DatabaseError databaseError) {
-
+                createAlertDialogWithTitleAndMessage("Error", "Couldn't access Database");
             }
         });
     }
@@ -258,9 +252,8 @@ public class ScanActivity extends AppCompatActivity {
                 try {
                     Date date = formatter.parse(reader.nextString());
                     long diff= TimeUnit.DAYS.convert(date.getTime() - new Date().getTime(), TimeUnit.MILLISECONDS);
-                    Log.d("James2", "readRosterFromFile: "+diff);
                     if(diff > 30) {
-                        downloadRoster();
+                        downloadRoster(date);
                         return;
                     }
                 } catch(ParseException pe) {
@@ -327,12 +320,13 @@ public class ScanActivity extends AppCompatActivity {
         }
     }
 
-    public String formatSchoolYearFromString(String day) {
-        String[] date = day.split(" ");
-        String[] months = getString(R.string.months).split(":");
+
+    public String formatSchoolYearFromString(String todayDate) {
+        String[] date = todayDate.replace(",","").split(" "); //turns Aug 21, 2019 to ['Aug', '21', '2019'].
+        String[] months = getString(R.string.months).split(":"); //String of short month names like Jan, Feb, Mar...
         int year = Integer.parseInt(date[2]);
-        for (String s : months) {
-            if (s.equals(date[0])) {
+        for (String month : months) {
+            if (month.equals(date[0])) {
                 return "" + year + "-" + (year + 1);//ex. year = 2018 and month is august --> 2018-2019
             }
         }
@@ -342,8 +336,9 @@ public class ScanActivity extends AppCompatActivity {
     public String formatSchoolYearFromDateObject(Date date) {
         calendar.setTime(date);
         int month = calendar.get(Calendar.MONTH);
+        Log.d("month", "formatSchoolYearFromDateObject: "+month);
         int year = calendar.get(Calendar.YEAR);
-        if (month >= 8) {
+        if (month >= 7) {
             return "" + year + "-" + (year + 1);
         } else {
             return "" + (year - 1) + "-" + year;
@@ -371,15 +366,23 @@ public class ScanActivity extends AppCompatActivity {
         return 0L;
     }
 
-    public Person searchForStudentInMap(String[] options) {
+    public ArrayList<Person> searchForPersonInMap(String[] options) {
+        ArrayList<Person> pList = new ArrayList<>();
         if (allPeople.get(options[0]) != null) {
             for (Person p : Objects.requireNonNull(allPeople.get(options[0]))) {
                 if (p.getName().equals(options[1])) {
-                    return p;
+                    pList.add(p);
                 }
             }
-            createAlertDialogWithTitleAndMessage("Person Not Found", "" + options[1] + "Not found.\n Re-Download Roster and try again if person was recently added.");
-            return null;
+            Log.d("TAYAG", "searchForPersonInMap: "+pList);
+            if(pList.size() > 0) {
+                return pList;
+//                return pList.toArray(Person[] pe);
+            } else {
+                createAlertDialogWithTitleAndMessage("Person Not Found", "" + options[1] + "Not found.\n Re-Download Roster and try again if person was recently added.");
+                return null;
+            }
+
         }
         createAlertDialogWithTitleAndMessage("Person Not Found", "" + options[1] + "Not found.\n Re-Download Roster and try again if person was recently added.");
         return null;
@@ -387,6 +390,7 @@ public class ScanActivity extends AppCompatActivity {
 
     public boolean personIsTardy(int hour, int minute) {
         return (calendar.get(Calendar.HOUR_OF_DAY) > hour) || (calendar.get(Calendar.HOUR_OF_DAY) == hour && calendar.get(Calendar.MINUTE) > minute);
+
     }
 
     public void createAlertDialogWithTitleAndMessage(String title, String message) {
@@ -410,7 +414,7 @@ public class ScanActivity extends AppCompatActivity {
             if (data == null) return;
             //Getting the passed result
             String result = data.getStringExtra("com.blikoon.qrcodescanner.got_qr_scan_relult");
-            final String[] options = result.split(":");
+            String[] options = result.split(":");
             for(int i = 0; i<options.length; i++) {
                 options[i] = options[i].trim();
             }
@@ -418,41 +422,13 @@ public class ScanActivity extends AppCompatActivity {
                 Toast.makeText(this, "Unable to parse QR Code. Try again or scan a different one", Toast.LENGTH_SHORT).show();
                 return;
             }
-            String displayMessage = "Role: " + options[0] + "\n" + "Name: " + options[1];
-            displayMessage += options.length > 2 ? "\n" + "Grade" + options[2] : "";
-            AlertDialog alertDialog = new AlertDialog.Builder(ScanActivity.this).create();
-            alertDialog.setTitle("Is This You?");
-            alertDialog.setMessage(displayMessage);
-            alertDialog.setButton(AlertDialog.BUTTON_NEUTRAL, "Yes",
-                    new DialogInterface.OnClickListener() {
-                        public void onClick(DialogInterface dialog, int which) {
-                            Date date = new Date();
-                            schoolYear = formatSchoolYearFromDateObject(date);
-                            String time = DateFormat.getTimeInstance(DateFormat.SHORT).format(date);
-                            todayDate = DateFormat.getDateInstance().format(date);
-                            dateRef = mRootRef.child(schoolYear).child(todayDate);
-                            setFirebaseRefs();
-                            personScanned = searchForStudentInMap(options);
-                            personScanned.setTime(time);
-                            personScanned.setDate(todayDate);
-                            if ((personScanned.isStudentOrIntern() && (personIsTardy(10, 40))) || ((!personScanned.isStudentOrIntern()) && (personIsTardy(10, 10)))) {
-                                personScanned.setTardy(true);
-                                personScanned.setStatus(Person.Status.Tardy);
-                                startActivityForResult(new Intent(ScanActivity.this, TardyActivity.class), REQUEST_TARDY_INFORMATION);
-                            } else {
-                                personScanned.setStatus(Person.Status.Present);
-                                sendToDatabase(false);
-                            }
-                        }
-                    });
-            alertDialog.setButton(AlertDialog.BUTTON_NEGATIVE, "No", new DialogInterface.OnClickListener() {
-                @Override
-                public void onClick(DialogInterface dialog, int which) {
-                    Toast.makeText(ScanActivity.this, "Please Rescan your Code", Toast.LENGTH_SHORT).show();
-                    dialog.dismiss();
-                }
-            });
-            alertDialog.show();
+            ArrayList<Person> personArrayList = searchForPersonInMap(options);
+            if(personArrayList != null && !personArrayList.isEmpty()) {
+                createScanInformationDialog(options, personArrayList);
+            } else {
+                createAlertDialogWithTitleAndMessage("Error", "We were unable to find this person, Please open" +
+                        " the menu on the top right and select download roster if you have recently updated it. Otherwise, try again.");
+            }
         } else if(requestCode == REQUEST_TARDY_INFORMATION) {
             if (data == null) return;
             String[] tardyInfo = data.getStringArrayExtra("tardyInfo");
@@ -592,6 +568,62 @@ public class ScanActivity extends AppCompatActivity {
             createAlertDialogWithTitleAndMessage("Unexpected Error", "Could not save student for later retrieval. Please try again.");
         }
         return false;
+    }
+
+
+    public void createScanInformationDialog(String[] options, ArrayList<Person> pArrayList) {
+        final ArrayList<Person> personArrayList = pArrayList;
+        String displayMessage = "Role: " + options[0] + "\n" + "Name: " + options[1];
+        displayMessage += options.length > 2 ? "\n" + "Grade" + options[2] : "";
+
+        AlertDialog.Builder alertDialog = new AlertDialog.Builder(ScanActivity.this);
+        View mView = getLayoutInflater().inflate(R.layout.alert_dialog, null);
+        final Spinner sp = mView.findViewById(R.id.spinner3);
+        String[] s = new String[personArrayList.size()];
+        if(options[0].equals("Management") || options[0].equals("Intern")) {
+            s[0] = "";
+        } else {
+            for (int i = 0; i < personArrayList.size(); i++) {
+                s[i] = personArrayList.get(i).getGrade();
+            }
+        }
+        final ArrayAdapter<String> adp = new ArrayAdapter<>(ScanActivity.this,
+                android.R.layout.simple_spinner_item, s);
+        adp.setDropDownViewResource(R.layout.spinner_item);
+        sp.setAdapter(adp);
+        alertDialog.setView(mView);
+        alertDialog.setTitle("Is This You?");
+        alertDialog.setMessage(displayMessage);
+        alertDialog.setPositiveButton("Yes",
+                new DialogInterface.OnClickListener() {
+                    public void onClick(DialogInterface dialog, int which) {
+                        Date date = new Date();
+                        schoolYear = formatSchoolYearFromDateObject(date);
+                        String time = DateFormat.getTimeInstance(DateFormat.SHORT).format(date);
+                        todayDate = DateFormat.getDateInstance().format(date);
+                        int index = sp.getSelectedItemPosition();
+                        personScanned = personArrayList.get(index);
+                        personScanned.setTime(time);
+                        personScanned.setDate(todayDate);
+                        Log.d("THESETIMES", "personIsTardy: "+calendar.get(Calendar.HOUR_OF_DAY) + " " + calendar.get((Calendar.MINUTE)));
+                        if ((personScanned.isStudentOrIntern() && (personIsTardy(10, 55))) || ((!personScanned.isStudentOrIntern()) && (personIsTardy(10, 10)))) {
+                            personScanned.setTardy(true);
+                            personScanned.setStatus(Person.Status.T);
+                            startActivityForResult(new Intent(ScanActivity.this, TardyActivity.class), REQUEST_TARDY_INFORMATION);
+                        } else {
+                            personScanned.setStatus(Person.Status.P);
+                            sendToDatabase(false);
+                        }
+                    }
+                });
+        alertDialog.setNegativeButton("No", new DialogInterface.OnClickListener() {
+            @Override
+            public void onClick(DialogInterface dialog, int which) {
+                Toast.makeText(ScanActivity.this, "Please Rescan your Code", Toast.LENGTH_SHORT).show();
+                dialog.dismiss();
+            }
+        });
+        alertDialog.create().show();
     }
 
 }

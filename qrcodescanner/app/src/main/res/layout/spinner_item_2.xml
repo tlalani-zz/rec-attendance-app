@@ -4,8 +4,8 @@
     android:layout_height="wrap_content"
     android:layout_marginTop="4dp"
     android:layout_marginBottom="4dp"
-    android:background="@android:color/white"
+    android:background="@color/colorPrimary"
     android:gravity="left"
-    android:padding="10dip"
-    android:textColor="@android:color/black"
+    android:padding="5dip"
+    android:textColor="@android:color/white"
     android:textSize="18sp" />

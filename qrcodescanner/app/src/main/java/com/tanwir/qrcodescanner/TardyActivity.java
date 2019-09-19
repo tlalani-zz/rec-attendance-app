@@ -30,7 +30,7 @@ public class TardyActivity extends AppCompatActivity implements AdapterView.OnIt
         options = new String[2];
         tardyReason = (Spinner) findViewById(R.id.tardyReason);
         comments = (TextView) findViewById(R.id.comments);
-        reasons = ArrayAdapter.createFromResource(this, R.array.reasons, R.layout.spinner_item);
+        reasons = ArrayAdapter.createFromResource(this, R.array.reasons, R.layout.spinner_item_2);
         tardyReason.setAdapter(reasons);
         tardyReason.setOnItemSelectedListener(this);
         SELECT_TEXT = reasons.getItem(0).toString();

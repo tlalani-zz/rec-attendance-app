@@ -52,4 +52,6 @@
         <item>Bad Contact Number</item>
         <item>Other</item>
     </array>
+    <string name="first_time_file_key">first_time_file</string>
+    <string name="first_time_key">first_time</string>
 </resources>

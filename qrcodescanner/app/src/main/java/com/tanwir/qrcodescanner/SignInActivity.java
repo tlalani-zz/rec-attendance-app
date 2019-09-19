@@ -71,7 +71,7 @@ public class SignInActivity extends AppCompatActivity {
                     mLoginBtn.setVisibility(View.VISIBLE);
                     createLoginFailureDialog("Sign In Error", "Unable to Sign In, Please check your email or password");
                 } else {
-                    startActivity(new Intent(SignInActivity.this, ScanActivity.class));
+                    startActivity(new Intent(SignInActivity.this, RecSelectActivity.class));
                 }
             }
         });
