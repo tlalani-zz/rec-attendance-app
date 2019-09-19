@@ -449,15 +449,14 @@ public class ScanActivity extends AppCompatActivity {
     }
 
     public boolean sendToDatabase(boolean sendingFromFile) {
-        DatabaseReference currentRef = dbRoot.child("Dates").child(schoolYear).child(todayDate);
+        DatabaseReference currentRef = dbRoot.child("Dates");
         if (personScanned != null) {
             if (connectedToInternet()) {
                 if (sendingFromFile) {
                     schoolYear = formatSchoolYearFromString(personScanned.getDate());
                     todayDate = personScanned.getDate();
-                    currentRef = currentRef.child(schoolYear).child(todayDate);
                 }
-
+                currentRef = currentRef.child(schoolYear).child(todayDate);
                 //Getting Reference
                 if(personScanned.hasGrade()) {
                     currentRef = currentRef.child(personScanned.getRole())
@@ -478,7 +477,7 @@ public class ScanActivity extends AppCompatActivity {
             } else {
                 savedPeople.add(personScanned);
                 writeSavedStudentsToFile();
-                Toast.makeText(this, "No Internet, Student saved to file, attendance not updated", Toast.LENGTH_SHORT).show();
+                Toast.makeText(this, "No Internet, Student saved locally, attendance not updated", Toast.LENGTH_SHORT).show();
                 return false;
             }
         }
