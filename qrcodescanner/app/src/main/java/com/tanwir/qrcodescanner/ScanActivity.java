@@ -22,7 +22,6 @@ import android.view.MenuInflater;
 import android.view.MenuItem;
 import android.view.View;
 import android.widget.ArrayAdapter;
-import android.widget.Button;
 import android.widget.Spinner;
 import android.widget.Toast;
 
@@ -52,6 +51,7 @@ import java.util.GregorianCalendar;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.concurrent.TimeUnit;
@@ -59,6 +59,9 @@ import java.util.concurrent.TimeUnit;
 public class ScanActivity extends AppCompatActivity {
     private static final int REQUEST_CODE_QR_SCAN = 101;
     private static final int REQUEST_TARDY_INFORMATION = 102;
+    private static final String ROSTER_FILE = "roster";
+    private static final String LOCAL_SAVED_STUDENTS_FILE = "saved";
+    private static final String DIVIDER = "#";
     private String todayDate;
     private String schoolYear;
     private Person personScanned;
@@ -101,9 +104,15 @@ public class ScanActivity extends AppCompatActivity {
         }
     }
 
-    public String getRosterFileName() {
+    public String getFileName(String s) {
         String shift = currentConfig.re_shift.replace("/", "@");
-        return "roster#" + currentConfig.re_center + "#"+currentConfig.re_class + "#" + shift + ".json";
+        if(ROSTER_FILE.equals(s)) {
+            return ROSTER_FILE + DIVIDER + currentConfig.re_center + DIVIDER + currentConfig.re_class + DIVIDER + shift + ".json";
+        } else if(LOCAL_SAVED_STUDENTS_FILE.equals(s)) {
+            return LOCAL_SAVED_STUDENTS_FILE + DIVIDER + currentConfig.re_center + DIVIDER + currentConfig.re_class + DIVIDER + shift + ".txt";
+        } else {
+            return null;
+        }
     }
 
 
@@ -121,10 +130,12 @@ public class ScanActivity extends AppCompatActivity {
                 downloadRoster(new Date());
                 return true;
             case R.id.save:
-                readAndAddStudentsFromFile();
+                //readAndAddStudentsFromFile();
+                Toast.makeText(this, "This feature is currently being developed", Toast.LENGTH_SHORT).show();
                 return true;
             case R.id.manual:
-                startActivity(new Intent(this, ManualEntryActivity.class));
+                //startActivity(new Intent(this, ManualEntryActivity.class));
+                Toast.makeText(this, "This feature is currently being developed", Toast.LENGTH_SHORT).show();
                 return true;
             default:
                 return super.onOptionsItemSelected(item);
@@ -155,7 +166,7 @@ public class ScanActivity extends AppCompatActivity {
     }
 
     @Override
-    public void onRequestPermissionsResult(int requestCode, @NonNull String permissions[], @NonNull int[] grantResults) {
+    public void onRequestPermissionsResult(int requestCode, @NonNull String[] permissions, @NonNull int[] grantResults) {
         if (requestCode == 12) {
             // If request is cancelled, the result arrays are empty.
             if (grantResults.length > 0
@@ -246,12 +257,12 @@ public class ScanActivity extends AppCompatActivity {
     public void readRosterFromFile() {
         if (rosterExists()) {
             try {
-                InputStream is = openFileInput(getRosterFileName());
+                InputStream is = openFileInput(getFileName(ROSTER_FILE));
                 JsonReader reader = new JsonReader(new InputStreamReader(is, StandardCharsets.UTF_8));
                 allPeople = initializeMap();
                 reader.beginObject();
                 reader.nextName();
-                SimpleDateFormat formatter = new SimpleDateFormat("MMM dd, yyyy");
+                SimpleDateFormat formatter = new SimpleDateFormat("MMM dd, yyyy", Locale.US);
                 try {
                     Date date = formatter.parse(reader.nextString());
                     long diff= TimeUnit.DAYS.convert(date.getTime() - new Date().getTime(), TimeUnit.MILLISECONDS);
@@ -296,7 +307,7 @@ public class ScanActivity extends AppCompatActivity {
 
     public void saveRoster(HashMap<String, ArrayList<Person>> people) {
         try {
-            FileOutputStream os = openFileOutput(getRosterFileName(), Context.MODE_PRIVATE);
+            FileOutputStream os = openFileOutput(getFileName(ROSTER_FILE), Context.MODE_PRIVATE);
             JsonWriter writer = new JsonWriter(new OutputStreamWriter(os, StandardCharsets.UTF_8));
             writer.setIndent(" ");
             writer.beginObject();
@@ -357,12 +368,12 @@ public class ScanActivity extends AppCompatActivity {
     }
 
     public boolean rosterExists() {
-        File f = new File(getFilesDir() + "/" + getRosterFileName());
+        File f = new File(getFilesDir() + "/" + getFileName(ROSTER_FILE));
         return f.exists() && f.length() > 0;
     }
 
     public long peopleNotSaved() {
-        File file = new File(getFilesDir() + "/" + getString(R.string.file_name));
+        File file = new File(getFilesDir() + "/" + getFileName(LOCAL_SAVED_STUDENTS_FILE));
         if (file.exists() && file.length() > 0) {
             return file.length();
         }
@@ -377,7 +388,6 @@ public class ScanActivity extends AppCompatActivity {
                     pList.add(p);
                 }
             }
-            Log.d("TAYAG", "searchForPersonInMap: "+pList);
             if(pList.size() > 0) {
                 return pList;
 //                return pList.toArray(Person[] pe);
@@ -482,7 +492,7 @@ public class ScanActivity extends AppCompatActivity {
                 return true;
             } else {
                 savedPeople.add(personScanned);
-                writeSavedStudentsToFile();
+                writeSavedStudentsToFile(Context.MODE_APPEND);
                 Toast.makeText(this, "No Internet, Student saved locally, attendance not updated", Toast.LENGTH_SHORT).show();
                 return false;
             }
@@ -495,7 +505,7 @@ public class ScanActivity extends AppCompatActivity {
         if (peopleNotSaved() > 0) {
             try {
                 String line;
-                InputStream is = openFileInput(getString(R.string.file_name));
+                InputStream is = openFileInput(getFileName(LOCAL_SAVED_STUDENTS_FILE));
                 InputStreamReader isr = new InputStreamReader(is);
                 BufferedReader reader = new BufferedReader(isr);
 
@@ -517,16 +527,17 @@ public class ScanActivity extends AppCompatActivity {
                         }
                     }
                 }
-                writeSavedStudentsToFile();
+                writeSavedStudentsToFile(Context.MODE_PRIVATE);
             } catch (Exception e) {
                 createAlertDialogWithTitleAndMessage("Error", "There was an error sending to database please try again.");
+                writeSavedStudentsToFile(Context.MODE_PRIVATE);
             }
         }
     }
 
-    public boolean writeSavedStudentsToFile() {
+    public boolean writeSavedStudentsToFile(int mode) {
         try {
-            FileOutputStream os = openFileOutput(getString(R.string.file_name), Context.MODE_PRIVATE);
+            FileOutputStream os = openFileOutput(getFileName(LOCAL_SAVED_STUDENTS_FILE), mode);
             OutputStreamWriter osw = new OutputStreamWriter(os);
             if (savedPeople.size() > 0) {
                 Iterator itr = savedPeople.iterator();
@@ -538,7 +549,7 @@ public class ScanActivity extends AppCompatActivity {
                 }
             } else {
                 if (peopleNotSaved() == 0) {
-                    return new File(getFilesDir() + "/" + getString(R.string.file_name)).delete();
+                    return new File(getFilesDir() + "/" + getFileName(LOCAL_SAVED_STUDENTS_FILE)).delete();
                 } else {
                     return false;
                 }
@@ -589,7 +600,6 @@ public class ScanActivity extends AppCompatActivity {
                         personScanned.setDate(todayDate);
                         Log.d("THESETIMES", "personIsTardy: "+calendar.get(Calendar.HOUR_OF_DAY) + " " + calendar.get((Calendar.MINUTE)));
                         if ((personScanned.isStudentOrIntern() && (personIsTardy(10, 55))) || ((!personScanned.isStudentOrIntern()) && (personIsTardy(10, 10)))) {
-                            personScanned.setTardy(true);
                             personScanned.setStatus(Person.Status.T);
                             startActivityForResult(new Intent(ScanActivity.this, TardyActivity.class), REQUEST_TARDY_INFORMATION);
                         } else {

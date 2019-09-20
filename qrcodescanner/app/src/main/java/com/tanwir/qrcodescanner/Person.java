@@ -1,19 +1,21 @@
 package com.tanwir.qrcodescanner;
 
+import java.io.Serializable;
+
 import lombok.Data;
 import lombok.NonNull;
 
 @Data
-public class Person {
+public class Person implements Serializable {
     private String date;
     private String role;
     private String grade;
     private String name;
     private String reason;
-    private boolean tardy;
     private String time;
     private String comments;
     private Status status;
+    private String DIVIDER = "#";
 
     enum Status {
         A, P, T;
@@ -44,25 +46,21 @@ public class Person {
         return this.grade != null;
     }
 
-    boolean isTardy() {
-        return tardy;
-    }
-
     boolean isStudentOrIntern() {
         return (this.role.equals("Student") || this.role.equals("Intern"));
     }
 
 
-    String toFileString() {
-        StringBuilder sb = new StringBuilder();
-        sb.append(this.date);
-        sb.append("#"+this.role);
-        sb.append("#"+this.grade);
-        sb.append("#"+this.name);
-        sb.append("#"+this.time);
-        sb.append("#"+this.reason);
-        sb.append("#"+this.comments);
-        sb.append("#"+this.status+"\n");
-        return sb.toString();
+    @Override
+    public String toString() {
+        return this.date + DIVIDER +
+                this.role + DIVIDER +
+                this.grade + DIVIDER +
+                this.name + DIVIDER +
+                this.reason + DIVIDER +
+                this.time + DIVIDER +
+                this.comments + DIVIDER +
+                this.status+"\n";
     }
+
 }

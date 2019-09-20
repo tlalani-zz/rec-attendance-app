@@ -102,6 +102,7 @@ public class RecSelectActivity extends AppCompatActivity implements AdapterView.
 
     public void getShifts() {
         DatabaseReference ref = mRootRef.child("REC").child(re_center).child(re_class).child("Shifts");
+        shifts.clear();
         ref.addListenerForSingleValueEvent(new ValueEventListener() {
             @Override
             public void onDataChange(@NonNull DataSnapshot dataSnapshot) {
