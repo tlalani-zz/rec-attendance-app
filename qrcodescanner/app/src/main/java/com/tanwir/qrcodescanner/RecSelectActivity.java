@@ -155,7 +155,7 @@ public class RecSelectActivity extends AppCompatActivity implements AdapterView.
     public void onNothingSelected(AdapterView<?> parent) {
 
     }
-
+    //Sends  { re_center: Center, re_class: Class, re_shift: Shift_Day/Shift_Time }
     public void goToApp(View v) {
         if(re_center != null && re_class != null && re_shift != null) {
             Intent i = new Intent(RecSelectActivity.this, ScanActivity.class);
