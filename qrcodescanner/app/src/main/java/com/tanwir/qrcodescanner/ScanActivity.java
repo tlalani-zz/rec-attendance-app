@@ -62,7 +62,8 @@ public class ScanActivity extends AppCompatActivity {
     private String todayDate;
     private String schoolYear;
     private Person personScanned;
-    private Calendar calendar;
+    private Calendar currentTime;
+    private Calendar tardyTime;
     private HashMap<String, ArrayList<Person>> allPeople;
     private HashSet<Person> savedPeople = new HashSet<>();
     DatabaseReference dbRoot = FirebaseDatabase.getInstance().getReference();
@@ -72,9 +73,12 @@ public class ScanActivity extends AppCompatActivity {
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_scan);
-        calendar = GregorianCalendar.getInstance();
-        calendar.setTime(new Date());
+        currentTime = Calendar.getInstance();
+        schoolYear = formatSchoolYearFromDateObject();
         getCurrentConfig(getIntent());
+        /* Check config object in RecSelectActivity.java */
+        setupTardyTime(currentConfig.re_shift.split("/")[1]);
+        createAlertDialogWithTitleAndMessage("This is your Tardy Time", tardyTime.getTime().toString());
         dbRoot = dbRoot.child("REC/")
                 .child(currentConfig.re_center)
                 .child(currentConfig.re_class)
@@ -83,7 +87,7 @@ public class ScanActivity extends AppCompatActivity {
         checkPermissions();
         if (connectedToInternet()) {
             if (!rosterExists()) {
-                downloadRoster(new Date());
+                downloadRoster();
             }
             readRosterFromFile();
             readAndAddStudentsFromFile();
@@ -118,7 +122,7 @@ public class ScanActivity extends AppCompatActivity {
     public boolean onOptionsItemSelected(MenuItem item) {
         switch (item.getItemId()) {
             case R.id.roster:
-                downloadRoster(new Date());
+                downloadRoster();
                 return true;
             case R.id.save:
                 readAndAddStudentsFromFile();
@@ -190,8 +194,8 @@ public class ScanActivity extends AppCompatActivity {
         }
     }
 
-    public void downloadRoster(Date date) {
-        schoolYear = formatSchoolYearFromDateObject(date);
+    public void downloadRoster() {
+        schoolYear = formatSchoolYearFromDateObject();
         DatabaseReference rosterRef = dbRoot.child("People").child(schoolYear);
         Query q = rosterRef.orderByKey();
         final HashMap<String, ArrayList<Person>> people = initializeMap();
@@ -256,7 +260,7 @@ public class ScanActivity extends AppCompatActivity {
                     Date date = formatter.parse(reader.nextString());
                     long diff= TimeUnit.DAYS.convert(date.getTime() - new Date().getTime(), TimeUnit.MILLISECONDS);
                     if(diff > 30) {
-                        downloadRoster(date);
+                        downloadRoster();
                         return;
                     }
                 } catch(ParseException pe) {
@@ -336,11 +340,11 @@ public class ScanActivity extends AppCompatActivity {
         return "" + (year - 1) + "-" + year;//ex. year = 2019 and month is february --> 2018-2019
     }
 
-    public String formatSchoolYearFromDateObject(Date date) {
-        calendar.setTime(date);
-        int month = calendar.get(Calendar.MONTH);
+    public String formatSchoolYearFromDateObject() {
+        currentTime.setTime(new Date());
+        int month = currentTime.get(Calendar.MONTH);
         Log.d("month", "formatSchoolYearFromDateObject: "+month);
-        int year = calendar.get(Calendar.YEAR);
+        int year = currentTime.get(Calendar.YEAR);
         if (month >= 7) {
             return "" + year + "-" + (year + 1);
         } else {
@@ -389,11 +393,6 @@ public class ScanActivity extends AppCompatActivity {
         }
         createAlertDialogWithTitleAndMessage("Person Not Found", "" + options[1] + "Not found.\n Re-Download Roster and try again if person was recently added.");
         return null;
-    }
-
-    public boolean personIsTardy(int hour, int minute) {
-        return (calendar.get(Calendar.HOUR_OF_DAY) > hour) || (calendar.get(Calendar.HOUR_OF_DAY) == hour && calendar.get(Calendar.MINUTE) > minute);
-
     }
 
     public void createAlertDialogWithTitleAndMessage(String title, String message) {
@@ -579,16 +578,15 @@ public class ScanActivity extends AppCompatActivity {
         alertDialog.setPositiveButton("Yes",
                 new DialogInterface.OnClickListener() {
                     public void onClick(DialogInterface dialog, int which) {
-                        Date date = new Date();
-                        schoolYear = formatSchoolYearFromDateObject(date);
-                        String time = DateFormat.getTimeInstance(DateFormat.SHORT).format(date);
-                        todayDate = DateFormat.getDateInstance().format(date);
+                        currentTime.setTime(new Date());
+                        schoolYear = formatSchoolYearFromDateObject();
+                        String time = DateFormat.getTimeInstance(DateFormat.SHORT).format(currentTime.getTime());
+                        todayDate = DateFormat.getDateInstance().format(currentTime.getTime());
                         int index = sp.getSelectedItemPosition();
                         personScanned = personArrayList.get(index);
                         personScanned.setTime(time);
                         personScanned.setDate(todayDate);
-                        Log.d("THESETIMES", "personIsTardy: "+calendar.get(Calendar.HOUR_OF_DAY) + " " + calendar.get((Calendar.MINUTE)));
-                        if ((personScanned.isStudentOrIntern() && (personIsTardy(10, 55))) || ((!personScanned.isStudentOrIntern()) && (personIsTardy(10, 10)))) {
+                        if (isPersonTardy()) {
                             personScanned.setTardy(true);
                             personScanned.setStatus(Person.Status.T);
                             startActivityForResult(new Intent(ScanActivity.this, TardyActivity.class), REQUEST_TARDY_INFORMATION);
@@ -606,6 +604,37 @@ public class ScanActivity extends AppCompatActivity {
             }
         });
         alertDialog.create().show();
+    }
+
+    public void setupTardyTime(String times) {
+        Integer[] s2 = parseDate(times);
+        try {
+            tardyTime = Calendar.getInstance();
+            tardyTime.setTime(new Date());
+            tardyTime.set(Calendar.HOUR_OF_DAY, s2[0]);
+            tardyTime.set(Calendar.MINUTE, s2[1]);
+            tardyTime.add(Calendar.MINUTE, 10);
+            tardyTime.set(Calendar.MILLISECOND, 0);
+            tardyTime.set(Calendar.SECOND, 0);
+        } catch(Exception e) {
+            e.printStackTrace();
+        }
+    }
+
+    public boolean isPersonTardy() {
+        currentTime.set(Calendar.SECOND, 0);
+        currentTime.set(Calendar.MILLISECOND, 0);
+        return currentTime.getTime().before(tardyTime.getTime()) || currentTime.getTime().equals(tardyTime.getTime());
+    }
+
+
+    public static Integer[] parseDate(String s) {
+        String[] s2 = s.split("-")[0].split("_");
+        if(s2[1].equals("AM")) {
+            return new Integer[]{Integer.parseInt(s2[0].split(":")[0]), (Integer.parseInt(s2[0].split(":")[1]))};
+        } else {
+            return new Integer[]{Integer.parseInt(s2[0].split(":")[0]) + 12, (Integer.parseInt(s2[0].split(":")[1]))};
+        }
     }
 
 }
