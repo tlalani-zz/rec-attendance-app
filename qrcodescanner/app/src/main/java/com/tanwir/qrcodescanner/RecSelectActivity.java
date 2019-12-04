@@ -108,7 +108,7 @@ public class RecSelectActivity extends AppCompatActivity implements AdapterView.
                         shifts.add(day.getKey() + ", " + time.getKey());
                     }
                 }
-                String[] a = createAdapter(shifts, "Select a Shift");
+                String[] a = createAdapter(shifts, null);
                 if(a == null) {
                     Toast.makeText(RecSelectActivity.this, "Error getting Shifts, Either restart, or re-login.", Toast.LENGTH_LONG).show();
                     return;

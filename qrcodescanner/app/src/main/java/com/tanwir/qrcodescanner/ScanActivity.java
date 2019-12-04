@@ -122,10 +122,12 @@ public class ScanActivity extends AppCompatActivity {
                 downloadRoster();
                 return true;
             case R.id.save:
-                readAndAddStudentsFromFile();
+                //readAndAddStudentsFromFile();
+                Toast.makeText(this, "This Feature is in development", Toast.LENGTH_SHORT).show();
                 return true;
             case R.id.manual:
-                startActivity(new Intent(this, ManualEntryActivity.class));
+                //startActivity(new Intent(this, ManualEntryActivity.class));
+                Toast.makeText(this, "This Feature is in development", Toast.LENGTH_SHORT).show();
                 return true;
             default:
                 return super.onOptionsItemSelected(item);
@@ -632,12 +634,8 @@ public class ScanActivity extends AppCompatActivity {
 
 
     public static Integer[] parseDate(String s) {
-        String[] s2 = s.split("-")[0].split("_");
-        if(s2[1].equals("AM")) {
-            return new Integer[]{Integer.parseInt(s2[0].split(":")[0]), (Integer.parseInt(s2[0].split(":")[1]))};
-        } else {
-            return new Integer[]{Integer.parseInt(s2[0].split(":")[0]) + 12, (Integer.parseInt(s2[0].split(":")[1]))};
-        }
+        String[] s2 = s.split("-")[0].split(":");
+        return new Integer[]{Integer.parseInt(s2[0]), (Integer.parseInt(s2[1]))};
     }
 
 }
