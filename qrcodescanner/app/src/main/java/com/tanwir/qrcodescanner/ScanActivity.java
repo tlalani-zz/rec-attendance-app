@@ -22,7 +22,6 @@ import android.view.MenuInflater;
 import android.view.MenuItem;
 import android.view.View;
 import android.widget.ArrayAdapter;
-import android.widget.Button;
 import android.widget.Spinner;
 import android.widget.Toast;
 
@@ -48,7 +47,6 @@ import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Calendar;
 import java.util.Date;
-import java.util.GregorianCalendar;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
@@ -78,7 +76,6 @@ public class ScanActivity extends AppCompatActivity {
         getCurrentConfig(getIntent());
         /* Check config object in RecSelectActivity.java */
         setupTardyTime(currentConfig.re_shift.split("/")[1]);
-        createAlertDialogWithTitleAndMessage("This is your Tardy Time", tardyTime.getTime().toString());
         dbRoot = dbRoot.child("REC/")
                 .child(currentConfig.re_center)
                 .child(currentConfig.re_class)
@@ -125,10 +122,12 @@ public class ScanActivity extends AppCompatActivity {
                 downloadRoster();
                 return true;
             case R.id.save:
-                readAndAddStudentsFromFile();
+                //readAndAddStudentsFromFile();
+                Toast.makeText(this, "This Feature is in development", Toast.LENGTH_SHORT).show();
                 return true;
             case R.id.manual:
-                startActivity(new Intent(this, ManualEntryActivity.class));
+                //startActivity(new Intent(this, ManualEntryActivity.class));
+                Toast.makeText(this, "This Feature is in development", Toast.LENGTH_SHORT).show();
                 return true;
             default:
                 return super.onOptionsItemSelected(item);
@@ -198,27 +197,27 @@ public class ScanActivity extends AppCompatActivity {
         schoolYear = formatSchoolYearFromDateObject();
         DatabaseReference rosterRef = dbRoot.child("People").child(schoolYear);
         Query q = rosterRef.orderByKey();
-        final HashMap<String, ArrayList<Person>> people = initializeMap();
+        final HashMap<String, ArrayList<Person>> people = new HashMap<>();
         q.addListenerForSingleValueEvent(new ValueEventListener() {
             @Override
             public void onDataChange(@NonNull DataSnapshot dataSnapshot) {
                 for (DataSnapshot role : dataSnapshot.getChildren()) {
-                    if (hasGrade(role.getKey())) {
-                        for (DataSnapshot grade : role.getChildren()) {
+                    for (DataSnapshot item : role.getChildren()) {
+                        if(hasGrade(item.getKey())) {
+                            DataSnapshot grade = item;
                             for (DataSnapshot name : grade.getChildren()) {
                                 if (name.getValue() != null) {
                                     //Person with role grade and name
                                     Person p = new Person(role.getKey(), name.getValue().toString(), grade.getKey());
-                                    Objects.requireNonNull(people.get(role.getKey())).add(p);
+                                    addToMap(people, role.getKey(), p);
                                 }
                             }
-                        }
-                    } else {
-                        for (DataSnapshot name : role.getChildren()) {
+                        } else {
+                            DataSnapshot name = item;
                             if (name.getValue() != null) {
-                                //Person with only role and name.
+                                //Person with role grade and name
                                 Person p = new Person(role.getKey(), name.getValue().toString(), null);
-                                Objects.requireNonNull(people.get(role.getKey())).add(p);
+                                addToMap(people, role.getKey(), p);
                             }
                         }
                     }
@@ -235,16 +234,13 @@ public class ScanActivity extends AppCompatActivity {
     }
 
     public boolean hasGrade(String s) {
-        return s != null && (s.equals("Student") || s.equals("Teacher"));
-    }
-
-    public HashMap<String, ArrayList<Person>> initializeMap() {
-        HashMap<String, ArrayList<Person>> map = new HashMap<>();
-        String[] roles = getString(R.string.roles).split(":");
-        for (String s : roles) {
-            map.put(s, new ArrayList<Person>());
+        if(s == null) return false;
+        for(String grade : getResources().getStringArray(R.array.grades)) {
+            if(grade.equals(s)) {
+                return true;
+            }
         }
-        return map;
+        return false;
     }
 
     public void readRosterFromFile() {
@@ -252,7 +248,7 @@ public class ScanActivity extends AppCompatActivity {
             try {
                 InputStream is = openFileInput(getRosterFileName());
                 JsonReader reader = new JsonReader(new InputStreamReader(is, StandardCharsets.UTF_8));
-                allPeople = initializeMap();
+                allPeople = new HashMap<>();
                 reader.beginObject();
                 reader.nextName();
                 SimpleDateFormat formatter = new SimpleDateFormat("MMM dd, yyyy");
@@ -285,7 +281,7 @@ public class ScanActivity extends AppCompatActivity {
                             }
                         }
                         reader.endObject();
-                        Objects.requireNonNull(allPeople.get(role)).add(p);
+                        addToMap(allPeople, role, p);
                     }
                     reader.endArray();
                 }
@@ -295,6 +291,15 @@ public class ScanActivity extends AppCompatActivity {
                 e.printStackTrace();
                 Toast.makeText(this, "Something Went Wrong", Toast.LENGTH_SHORT).show();
             }
+        }
+    }
+
+    public void addToMap(HashMap<String, ArrayList<Person>> map, String key, Person value) {
+        if(map.get(key) != null) {
+            map.get(key).add(value);
+        } else {
+            map.put(key, new ArrayList<Person>());
+            map.get(key).add(value);
         }
     }
 
@@ -311,7 +316,7 @@ public class ScanActivity extends AppCompatActivity {
                 for (Person p : entry.getValue()) {
                     writer.beginObject();
                     writer.name("Name").value(p.getName());
-                    if (p.getRole().equals("Student") || p.getRole().equals("Teacher"))
+                    if (p.getGrade() != null)
                         writer.name("Grade").value(p.getGrade());
                     writer.endObject();
                 }
@@ -624,17 +629,13 @@ public class ScanActivity extends AppCompatActivity {
     public boolean isPersonTardy() {
         currentTime.set(Calendar.SECOND, 0);
         currentTime.set(Calendar.MILLISECOND, 0);
-        return currentTime.getTime().before(tardyTime.getTime()) || currentTime.getTime().equals(tardyTime.getTime());
+        return !currentTime.getTime().before(tardyTime.getTime()) || currentTime.getTime().equals(tardyTime.getTime());
     }
 
 
     public static Integer[] parseDate(String s) {
-        String[] s2 = s.split("-")[0].split("_");
-        if(s2[1].equals("AM")) {
-            return new Integer[]{Integer.parseInt(s2[0].split(":")[0]), (Integer.parseInt(s2[0].split(":")[1]))};
-        } else {
-            return new Integer[]{Integer.parseInt(s2[0].split(":")[0]) + 12, (Integer.parseInt(s2[0].split(":")[1]))};
-        }
+        String[] s2 = s.split("-")[0].split(":");
+        return new Integer[]{Integer.parseInt(s2[0]), (Integer.parseInt(s2[1]))};
     }
 
 }

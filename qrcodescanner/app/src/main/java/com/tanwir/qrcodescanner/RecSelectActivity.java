@@ -71,8 +71,6 @@ public class RecSelectActivity extends AppCompatActivity implements AdapterView.
                 }
                 String[] a = new String[centers.size()];
                 a = centers.keySet().toArray(a);
-                String[] b = {"Select a Center"};
-                a = ArrayUtils.concat(b, a);
                 ArrayAdapter adapter = new ArrayAdapter<>(RecSelectActivity.this, android.R.layout.simple_spinner_item, a);
                 adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
                 center_select.setAdapter(adapter);
@@ -87,7 +85,7 @@ public class RecSelectActivity extends AppCompatActivity implements AdapterView.
     }
 
     public void getClasses() {
-        String[] a = createAdapter(centers.get(re_center), "Select a Class");
+        String[] a = createAdapter(centers.get(re_center), null);
         if(a == null) {
             Toast.makeText(this, "Error getting Classes, Either restart, or re-login.", Toast.LENGTH_LONG).show();
             return;
@@ -110,7 +108,7 @@ public class RecSelectActivity extends AppCompatActivity implements AdapterView.
                         shifts.add(day.getKey() + ", " + time.getKey());
                     }
                 }
-                String[] a = createAdapter(shifts, "Select a Shift");
+                String[] a = createAdapter(shifts, null);
                 if(a == null) {
                     Toast.makeText(RecSelectActivity.this, "Error getting Shifts, Either restart, or re-login.", Toast.LENGTH_LONG).show();
                     return;
@@ -132,21 +130,15 @@ public class RecSelectActivity extends AppCompatActivity implements AdapterView.
     public void onItemSelected(AdapterView<?> parent, View view, int position, long id) {
         switch (parent.getId()) {
             case R.id.location_spinner:
-                if(position != 0) {
-                    re_center = parent.getItemAtPosition(position).toString();
-                    getClasses();
-                }
+                re_center = parent.getItemAtPosition(position).toString();
+                getClasses();
                 break;
             case R.id.class_spinner:
-                if(position != 0) {
-                    re_class = parent.getItemAtPosition(position).toString();
-                    getShifts();
-                }
+                re_class = parent.getItemAtPosition(position).toString();
+                getShifts();
                 break;
             case R.id.shift_spinner:
-                if(position != 0) {
-                    re_shift = parent.getItemAtPosition(position).toString();
-                }
+                re_shift = parent.getItemAtPosition(position).toString();
                 break;
         }
     }
@@ -173,9 +165,11 @@ public class RecSelectActivity extends AppCompatActivity implements AdapterView.
         if(list.size() > 0) {
             String[] a = new String[list.size()];
             a = list.toArray(a);
-            String[] b = {initString};
-            String[] c = ArrayUtils.concat(b, a);
-            return c;
+            if(initString != null) {
+                String[] b = {initString};
+                a = ArrayUtils.concat(b, a);
+            }
+            return a;
         }
         return null;
     }
